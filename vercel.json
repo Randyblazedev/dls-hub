@@ -1,3 +1,4 @@
+
 {
   "version": 2,
   "builds": [
@@ -6,8 +7,8 @@
       "use": "@vercel/static"
     }
   ],
-  "outputDirectory": ".",
   "routes": [
+    { "src": "/public/(.*)", "dest": "/public/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
