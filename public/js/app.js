@@ -949,8 +949,6 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
       renderedDmIds.add(m.id);
 
       const isMine  = m.senderid === currentUser.id;
-      // Play sound for new DM messages from others
-      if (!isMine && lastDmMsgId) playNotifSound();
       const avSrc   = isMine
         ? (currentUserDoc?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserDoc?.username||"Me")}&background=0f1f17&color=b5ff47&size=40`)
         : (otherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=0f1f17&color=b5ff47&size=40`);
@@ -1103,6 +1101,7 @@ async function loadHomeStats() {
 
 function pushNotification(text) {
   notifications.unshift({ text, time: new Date() });
+  playNotifSound(); // Play sound for every incoming notification
 
   const badge   = document.getElementById("notif-badge");
   const listEl  = document.getElementById("notif-list");
