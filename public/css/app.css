@@ -144,6 +144,12 @@ textarea.form-input { resize: none; }
   box-shadow: 0 2px 8px rgba(255,214,0,0.2);
 }
 
+/* ── Leaderboard scroll container ── */
+.leaderboard-scroll::-webkit-scrollbar { width: 4px; }
+.leaderboard-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+.leaderboard-scroll::-webkit-scrollbar-thumb { background: rgba(255,214,0,0.3); border-radius: 9999px; }
+.leaderboard-scroll::-webkit-scrollbar-thumb:hover { background: #ffd600; }
+
 /* ── Leaderboard row ── */
 .lb-row {
   border-bottom: 1px solid rgba(255,255,255,0.06);
