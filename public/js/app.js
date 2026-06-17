@@ -22,7 +22,7 @@ let lastDmMsgId     = null;   // Track last DM message to detect new ones
 //  NOTIFICATION SOUNDS
 // ═══════════════════════════════════════════════════════════
 
-const notifAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczIj2NysijaTkmS5/HyJ1aLTFrm8fLpWc3KVKVxMumZzYpUpXEy6ZnNilSlcTLpmc2KVKVxMumZzYpUpXEy6ZnNilSlcTLpmc2KVKVxMumZzYpUg==');
+const notifAudio = new Audio('/public/sounds/notif.mp3');
 
 function playNotifSound() {
   if (!soundEnabled) return;
