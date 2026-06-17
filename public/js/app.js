@@ -543,7 +543,7 @@ function buildPostCard(postId, p, isProfile = false) {
         <button onclick="toggleComments('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition">
           <i data-lucide="message-square" class="w-3.5 h-3.5"></i> ${p.commentcount || 0}
         </button>
-        ${!isProfile ? `<button onclick="openDMFromPost('${p.authorid}','${escHtml(p.authorname)}')" class="flex items-center gap-1.5 hover:text-lime transition ml-auto">
+        ${!isMyPost ? `<button onclick="openDMFromPost('${p.authorid}','${escHtml(p.authorname)}')" class="flex items-center gap-1.5 hover:text-lime transition ml-auto">
           <i data-lucide="mail" class="w-3.5 h-3.5"></i> DM
         </button>` : ""}
       </div>
@@ -785,7 +785,7 @@ function appendChatMessage(container, m) {
   wrapper.innerHTML = `
     <img src="${avatarSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
     <div class="max-w-xs">
-      ${!isMine ? `<p class="text-xs text-mist mb-1">${escHtml(m.authorname)}</p>` : ""}
+      ${!isMine ? `<button onclick="openDMFromPost('${m.authorid}','${escHtml(m.authorname)}')" class="text-xs text-mist mb-1 hover:text-lime transition text-left">${escHtml(m.authorname)}</button>` : ""}
       <div class="${isMine ? "bubble-me" : "bubble-other"}">
         <p>${escHtml(m.content)}</p>
       </div>
