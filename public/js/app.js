@@ -543,9 +543,9 @@ function buildPostCard(postId, p, isProfile = false) {
         <button onclick="toggleComments('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition">
           <i data-lucide="message-square" class="w-3.5 h-3.5"></i> ${p.commentcount || 0}
         </button>
-        ${!isMyPost ? `<button onclick="openDMFromPost('${p.authorid}','${escHtml(p.authorname)}')" class="flex items-center gap-1.5 hover:text-lime transition ml-auto">
+        <button onclick="openDMFromPost('${p.authorid}','${escHtml(p.authorname)}')" class="flex items-center gap-1.5 hover:text-lime transition ml-auto">
           <i data-lucide="mail" class="w-3.5 h-3.5"></i> DM
-        </button>` : ""}
+        </button>
       </div>
       <!-- Comment section (collapsed) -->
       <div id="comments-${postId}" class="hidden mt-4 border-t border-line pt-4">
