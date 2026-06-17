@@ -357,10 +357,18 @@ html.light ::-webkit-scrollbar-thumb:hover {
 html.light .post-card:hover { border-color: #bdbdbd; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 html.light .feature-card:hover { border-color: #bdbdbd; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 
+/* ── Safe area for mobile notch/home bar ── */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* ── Mobile bottom nav padding ── */
 @media (max-width: 767px) {
   main { padding-bottom: 80px !important; }
   .page-view { padding-bottom: 80px !important; }
+  .bubble-me, .bubble-other { max-width: 85vw; }
+  .auth-card { padding: 20px !important; }
+  .form-input { padding: 10px 14px; font-size: 16px; }
 }
 
 /* ── Chat responsive fix ── */
@@ -368,8 +376,34 @@ html.light .feature-card:hover { border-color: #bdbdbd; box-shadow: 0 4px 12px r
   .dm-sidebar {
     width: 100% !important;
     min-width: 100% !important;
+    max-height: 40vh !important;
+    overflow-y: auto !important;
   }
   .dm-main {
     width: 100% !important;
+    min-height: 50vh !important;
+  }
+}
+
+/* ── Mobile feature cards grid fix ── */
+@media (max-width: 480px) {
+  .feature-card {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+  .post-card {
+    padding: 14px !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* ── Mobile touch targets ── */
+@media (max-width: 767px) {
+  button, a, .nav-link, .lb-tab {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .bottom-nav button {
+    min-height: 48px;
   }
 }

@@ -14,6 +14,32 @@ let dmUnsubscribe = null;   // Listener cleanup for DMs
 let chatUnsubscribe = null; // Listener cleanup for global chat
 let feedUnsubscribe = null; // Listener cleanup for feed
 let notifications  = [];    // In-memory notification list
+let soundEnabled   = localStorage.getItem('dls-sound') !== 'off'; // Sound toggle
+let lastChatMsgId  = null;   // Track last chat message to detect new ones
+let lastDmMsgId     = null;   // Track last DM message to detect new ones
+
+// ═══════════════════════════════════════════════════════════
+//  NOTIFICATION SOUNDS
+// ═══════════════════════════════════════════════════════════
+
+const notifAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczIj2NysijaTkmS5/HyJ1aLTFrm8fLpWc3KVKVxMumZzYpUpXEy6ZnNilSlcTLpmc2KVKVxMumZzYpUpXEy6ZnNilSlcTLpmc2KVKVxMumZzYpUg==');
+
+function playNotifSound() {
+  if (!soundEnabled) return;
+  try {
+    notifAudio.currentTime = 0;
+    notifAudio.play().catch(() => {});
+  } catch (_) {}
+}
+
+window.toggleSound = function () {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('dls-sound', soundEnabled ? 'on' : 'off');
+  const icon = document.getElementById('sound-icon');
+  if (icon) icon.setAttribute('data-lucide', soundEnabled ? 'volume-2' : 'volume-x');
+  lucide.createIcons();
+  showToast(soundEnabled ? 'Sound on 🔊' : 'Sound off 🔇');
+};
 
 // ═══════════════════════════════════════════════════════════
 //  REALTIME / POLLING HELPER
@@ -733,8 +759,13 @@ function initChat() {
         if (!renderedIds.has(m.id)) {
           renderedIds.add(m.id);
           appendChatMessage(container, m);
+          // Play sound for new messages from others
+          if (currentUser && m.authorid !== currentUser.id && lastChatMsgId) {
+            playNotifSound();
+          }
         }
       });
+      if (data.length) lastChatMsgId = data[data.length - 1].id;
       container.scrollTop = container.scrollHeight;
     } catch (_) { /* chat is non-critical */ }
   }
@@ -918,6 +949,8 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
       renderedDmIds.add(m.id);
 
       const isMine  = m.senderid === currentUser.id;
+      // Play sound for new DM messages from others
+      if (!isMine && lastDmMsgId) playNotifSound();
       const avSrc   = isMine
         ? (currentUserDoc?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserDoc?.username||"Me")}&background=0f1f17&color=b5ff47&size=40`)
         : (otherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=0f1f17&color=b5ff47&size=40`);

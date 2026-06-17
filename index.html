@@ -74,6 +74,10 @@
       </div>
 
       <!-- Right side: auth buttons OR avatar -->
+      <!-- Sound toggle -->
+      <button onclick="toggleSound()" class="p-2 text-mist hover:text-lime transition" title="Toggle sound">
+        <i data-lucide="volume-2" id="sound-icon" class="w-5 h-5"></i>
+      </button>
       <!-- Theme toggle (always visible) -->
       <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
         <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
@@ -106,8 +110,8 @@
         </div>
       </div>
 
-      <!-- Mobile hamburger -->
-      <button id="hamburger" class="md:hidden p-2 text-mist" onclick="toggleMobileMenu()">
+      <!-- Mobile hamburger (hidden on mobile — use bottom nav) -->
+      <button id="hamburger" class="hidden md:hidden p-2 text-mist" onclick="toggleMobileMenu()">
         <i data-lucide="menu" class="w-5 h-5"></i>
       </button>
     </div>
@@ -139,7 +143,7 @@
   <!-- ═══════════════════════════════════════════
        PAGE VIEWS  (only one visible at a time)
   ═══════════════════════════════════════════ -->
-  <main class="pt-14">
+  <main class="pt-20 pb-24 md:pb-8">
 
     <!-- ── HOME ── -->
     <div id="page-home" class="page-view">
@@ -546,7 +550,7 @@
   </main>
 
   <!-- Bottom Nav (mobile) -->
-  <nav id="bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-50 bg-turf border-t border-line flex items-center justify-around py-2 px-4">
+  <nav id="bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-50 bg-turf/95 backdrop-blur border-t border-line flex items-center justify-around py-2 px-2 safe-area-bottom">
     <button onclick="navigate('home')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
       <i data-lucide="home" class="w-5 h-5"></i>
       <span class="text-[10px]">Home</span>
@@ -573,7 +577,7 @@
   </nav>
 
   <!-- Toast notification -->
-  <div id="toast" class="hidden fixed bottom-6 right-6 z-50 bg-turf border border-line rounded-xl px-5 py-3 text-sm shadow-2xl flex items-center gap-3">
+  <div id="toast" class="hidden fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 z-[60] bg-turf border border-line rounded-xl px-5 py-3 text-sm shadow-2xl flex items-center gap-3 max-w-xs w-auto">
     <i data-lucide="check-circle" id="toast-icon" class="w-4 h-4 text-lime"></i>
     <span id="toast-msg"></span>
   </div>
