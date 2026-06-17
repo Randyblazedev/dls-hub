@@ -956,14 +956,19 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
         : (otherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=0f1f17&color=b5ff47&size=40`);
 
       const el = document.createElement("div");
+      el.id = `dm-msg-${m.id}`;
       el.className = `flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`;
       el.innerHTML = `
         <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
         <div>
           <div class="${isMine ? "bubble-me" : "bubble-other"}">${escHtml(m.content)}</div>
-          <p class="text-xs text-mist mt-1 ${isMine ? "text-right" : ""}">${timeAgo(m.created_at ? new Date(m.created_at) : new Date())}</p>
+          <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
+            <p class="text-xs text-mist">${timeAgo(m.created_at ? new Date(m.created_at) : new Date())}</p>
+            ${isMine ? `<button onclick="deleteDMMessage('${m.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+          </div>
         </div>`;
       dmContainer.appendChild(el);
+      lucide.createIcons();
     });
     dmContainer.scrollTop = dmContainer.scrollHeight;
   }
