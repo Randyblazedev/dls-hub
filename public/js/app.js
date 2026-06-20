@@ -10,6 +10,11 @@ import { supabase, getCurrentUser, onAuthChange } from "./supabase-config.js";
 let currentUser   = null;   // Supabase auth user
 let currentUserDoc = null;  // Row from "users" table
 let activeDMUser  = null;   // Currently open DM conversation
+
+// Expose globals for features.js
+window.getCurrentUser = () => currentUser;
+window.setCurrentUser = (u) => { currentUser = u; window.currentUser = u; };
+window.setCurrentUserDoc = (d) => { currentUserDoc = d; window.currentUserDoc = d; };
 let dmUnsubscribe = null;   // Listener cleanup for DMs
 let chatUnsubscribe = null; // Listener cleanup for global chat
 let feedUnsubscribe = null; // Listener cleanup for feed
@@ -91,7 +96,7 @@ function subscribeChanges(table, fetchFn, opts = {}) {
 /** Navigates to a page by name */
 window.navigate = function (page) {
   // Guard: redirect unauthenticated users away from protected pages
-  const protected_ = ["feed", "chat", "dm", "profile", "leaderboards"];
+  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "squads", "predictions", "potw", "admin"];
   if (protected_.includes(page) && !currentUser) {
     navigate("login");
     showToast("Please log in first", "error");
@@ -115,6 +120,10 @@ window.navigate = function (page) {
   if (page === "profile")      initProfile();
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
+  if (page === "squads")       initSquads();
+  if (page === "predictions")  initPredictions();
+  if (page === "potw")         initPOTW();
+  if (page === "admin")        initAdmin();
 
   // Re-init icons after DOM changes
   setTimeout(() => lucide.createIcons(), 50);
@@ -129,6 +138,7 @@ window.navigate = function (page) {
 
 onAuthChange(async (user) => {
   currentUser = user;
+  window.currentUser = user;
 
   const navAuth       = document.getElementById("nav-auth");
   const authButtons   = document.getElementById("auth-buttons");
@@ -160,6 +170,7 @@ onAuthChange(async (user) => {
       }
     }
     currentUserDoc = row || null;
+    window.currentUserDoc = currentUserDoc;
 
     // Update nav avatar
     const avatarUrl = currentUserDoc?.avatar ||
@@ -177,6 +188,7 @@ onAuthChange(async (user) => {
     loadHomeStats();
   } else {
     currentUserDoc = null;
+    window.currentUserDoc = null;
     navAuth.style.display = "none";
     authButtons.classList.remove("hidden");
     avatarMenu.classList.add("hidden");
@@ -531,6 +543,8 @@ function buildPostCard(postId, p, isProfile = false) {
           </div>
 
         </div>
+        <button onclick="sharePost('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition"><i data-lucide="share-2" class="w-3.5 h-3.5"></i></button>
+        <button onclick="reportContent('post','${postId}')" class="flex items-center gap-1.5 hover:text-coral transition"><i data-lucide="flag" class="w-3.5 h-3.5"></i></button>
         ${isMyPost ? `<button onclick="deletePost('${postId}')" class="text-coral hover:text-white text-xs flex items-center gap-1 ml-2 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button>` : ""}
       </div>
       <p class="text-ice text-sm leading-relaxed mb-4 whitespace-pre-wrap">${escHtml(p.content)}</p>
@@ -787,6 +801,7 @@ function appendChatMessage(container, m) {
     <div class="max-w-xs">
       ${!isMine ? `<button onclick="openDMFromPost('${m.authorid}','${escHtml(m.authorname)}')" class="text-xs text-mist mb-1 hover:text-lime transition text-left">${escHtml(m.authorname)}</button>` : ""}
       <div class="${isMine ? "bubble-me" : "bubble-other"}">
+        ${m.imageurl ? `<img src="${m.imageurl}" class="max-w-xs rounded-lg mb-2 cursor-pointer" onclick="window.open('${m.imageurl}','_blank')" />` : ''}
         <p>${escHtml(m.content)}</p>
       </div>
       <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">

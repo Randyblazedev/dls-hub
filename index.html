@@ -71,6 +71,9 @@
         <button onclick="navigate('chat')"          class="nav-link hover:text-ice transition">Community Chat</button>
         <button onclick="navigate('dm')"            class="nav-link hover:text-ice transition">Messages</button>
         <button onclick="navigate('leaderboards')"  class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('squads')"       class="nav-link hover:text-ice transition">Squads</button>
+        <button onclick="navigate('predictions')"   class="nav-link hover:text-ice transition">Predictions</button>
+        <button onclick="navigate('potw')"          class="nav-link hover:text-ice transition">POTW</button>
       </div>
 
       <!-- Right side: auth buttons OR avatar -->
@@ -123,6 +126,10 @@
         <button onclick="navigate('chat');toggleMobileMenu()"         class="text-left hover:text-ice">Community Chat</button>
         <button onclick="navigate('dm');toggleMobileMenu()"           class="text-left hover:text-ice">Messages</button>
         <button onclick="navigate('leaderboards');toggleMobileMenu()" class="text-left hover:text-ice">Leaderboards</button>
+        <button onclick="navigate('squads');toggleMobileMenu()"       class="text-left hover:text-ice">Squads</button>
+        <button onclick="navigate('predictions');toggleMobileMenu()"  class="text-left hover:text-ice">Predictions</button>
+        <button onclick="navigate('potw');toggleMobileMenu()"         class="text-left hover:text-ice">POTW</button>
+        <button onclick="navigate('admin');toggleMobileMenu()"        class="text-left hover:text-ice">Admin</button>
         <button onclick="navigate('profile');toggleMobileMenu()"      class="text-left hover:text-ice">My Profile</button>
         <button onclick="handleSignOut()"                              class="text-left text-coral">Sign Out</button>
       </div>
@@ -298,7 +305,7 @@
         <div class="bg-turf border border-line rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <div class="relative group">
             <img id="profile-avatar" src="" class="w-24 h-24 rounded-full ring-4 ring-lime/40 object-cover" />
-            <label for="avatar-upload" class="absolute inset-0 flex items-center justify-center bg-pitch/60 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition">
+            <label for="avatar-upload" class="absolute inset-0 flex items-center justify-center bg-pitch/60 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer transition">
               <i data-lucide="camera" class="w-6 h-6 text-lime"></i>
             </label>
             <input id="avatar-upload" type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)" />
@@ -376,14 +383,25 @@
     <!-- ── COMMUNITY CHAT ── -->
     <div id="page-chat" class="page-view hidden">
       <div class="max-w-3xl mx-auto px-4 pt-20 pb-24 flex flex-col" style="height:calc(100vh - 56px)">
-        <h1 class="font-display text-4xl text-lime mb-4">Community Chat</h1>
+        <div class="flex items-center justify-between mb-4">
+        <h1 class="font-display text-4xl text-lime">Community Chat</h1>
+        <span id="online-count" class="text-xs text-mist bg-turf border border-line rounded-full px-3 py-1 hidden"><span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1.5 animate-pulse"></span><span id="online-num">0</span> online</span>
+      </div>
         <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 mb-4 pr-1 min-h-0">
           <div class="text-center text-mist py-12">
             <i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i>
             Loading chat...
           </div>
         </div>
-        <div class="flex gap-3 mt-auto">
+        <div id="chat-image-preview" class="hidden mb-2 relative inline-block">
+          <img id="chat-preview-img" class="max-h-32 rounded-lg object-cover" />
+          <button onclick="removeChatImage()" class="absolute top-1 right-1 bg-coral text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
+        </div>
+        <div class="flex gap-2 mt-auto items-end">
+          <label class="cursor-pointer text-mist hover:text-lime transition flex items-center justify-center w-10 h-10 rounded-xl bg-turf border border-line shrink-0">
+            <i data-lucide="image" class="w-4 h-4"></i>
+            <input id="chat-image-input" type="file" accept="image/*" class="hidden" onchange="previewChatImage(event)" />
+          </label>
           <input id="chat-input" type="text" class="form-input flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMessage()" />
           <button onclick="sendChatMessage()" class="btn-lime px-5 py-2">
             <i data-lucide="send" class="w-4 h-4"></i>
@@ -459,6 +477,178 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PUBLIC PROFILE ── -->
+    <div id="page-profile-public" class="page-view hidden">
+      <div class="max-w-3xl mx-auto px-4 py-24">
+        <div class="bg-turf border border-line rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          <img id="pub-avatar" src="" class="w-24 h-24 rounded-full ring-4 ring-lime/40 object-cover" />
+          <div class="flex-1 text-center sm:text-left">
+            <h2 id="pub-username" class="font-display text-3xl text-lime"></h2>
+            <p id="pub-team" class="text-ice text-sm mb-1"></p>
+            <p id="pub-bio" class="text-mist text-sm mb-2"></p>
+            <p id="pub-joined" class="text-mist text-xs"></p>
+            <p id="pub-postcount" class="text-mist text-xs mt-1"></p>
+          </div>
+          <button id="pub-dm-btn" onclick="dmFromPublicProfile()" class="btn-ghost text-sm px-4 py-2">
+            <i data-lucide="mail" class="w-4 h-4"></i> DM
+          </button>
+        </div>
+        <div>
+          <h3 class="font-display text-2xl text-lime mb-4">Posts</h3>
+          <div id="pub-posts" class="space-y-4"><p class="text-mist text-sm">Loading...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SQUADS ── -->
+    <div id="page-squads" class="page-view hidden">
+      <div class="max-w-4xl mx-auto px-4 py-20">
+        <h1 class="font-display text-4xl text-lime mb-2">Squads</h1>
+        <p class="text-mist mb-6">Share your Dream League Soccer squad with the community</p>
+
+        <!-- Create squad form -->
+        <div class="bg-turf border border-line rounded-2xl p-5 mb-8">
+          <h3 class="font-display text-lg text-lime mb-4">Create Squad</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="form-label">Squad Name</label>
+              <input id="squad-name" type="text" class="form-input" placeholder="e.g. Thunder XI" />
+            </div>
+            <div>
+              <label class="form-label">Formation</label>
+              <select id="squad-formation" class="form-input">
+                <option value="4-4-2">4-4-2</option>
+                <option value="4-3-3">4-3-3</option>
+                <option value="3-5-2">3-5-2</option>
+                <option value="4-2-3-1">4-2-3-1</option>
+                <option value="5-3-2">5-3-2</option>
+                <option value="4-1-4-1">4-1-4-1</option>
+                <option value="3-4-3">3-4-3</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Players (one per line or comma-separated)</label>
+            <textarea id="squad-players" class="form-input" rows="4" placeholder="GK: Neuer&#10;DEF: Van Dijk, Ramos, ...&#10;MID: De Bruyne, Modric, ...&#10;FWD: Messi, Haaland, ..."></textarea>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Notes / Tactics</label>
+            <textarea id="squad-desc" class="form-input" rows="2" placeholder="Describe your playstyle..."></textarea>
+          </div>
+          <div class="mb-4">
+            <label class="cursor-pointer text-mist hover:text-lime transition flex items-center gap-2 text-sm">
+              <i data-lucide="image" class="w-4 h-4"></i><span>Screenshot (optional)</span>
+              <input id="squad-image-input" type="file" accept="image/*" class="hidden" onchange="previewSquadImage(event)" />
+            </label>
+            <div id="squad-image-preview" class="hidden mt-2 relative inline-block">
+              <img id="squad-preview-img" class="max-h-40 rounded-lg object-cover" />
+              <button onclick="removeSquadImage()" class="absolute top-1 right-1 bg-coral text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
+            </div>
+          </div>
+          <button onclick="createSquad()" class="btn-lime px-6 py-2">Share Squad</button>
+        </div>
+
+        <!-- Squads grid -->
+        <div id="squads-grid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <p class="text-mist text-center py-12 col-span-2">Loading squads...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PREDICTIONS ── -->
+    <div id="page-predictions" class="page-view hidden">
+      <div class="max-w-3xl mx-auto px-4 py-20">
+        <h1 class="font-display text-4xl text-lime mb-2">Predictions</h1>
+        <p class="text-mist mb-6">Predict match scores and earn points</p>
+
+        <!-- Admin: Create match -->
+        <div id="pred-admin-form" class="hidden bg-turf border border-line rounded-2xl p-5 mb-8">
+          <h3 class="font-display text-lg text-lime mb-4">Create Match</h3>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="form-label">Team A</label><input id="pred-team-a" type="text" class="form-input" placeholder="e.g. Barcelona" /></div>
+            <div><label class="form-label">Team B</label><input id="pred-team-b" type="text" class="form-input" placeholder="e.g. Real Madrid" /></div>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="form-label">Match Date</label><input id="pred-match-date" type="datetime-local" class="form-input" /></div>
+            <div><label class="form-label">Deadline</label><input id="pred-deadline" type="datetime-local" class="form-input" /></div>
+          </div>
+          <button onclick="createPredictionMatch()" class="btn-lime px-6 py-2">Create Match</button>
+        </div>
+
+        <!-- Upcoming matches -->
+        <div id="pred-matches" class="space-y-5">
+          <p class="text-mist text-center py-12">Loading matches...</p>
+        </div>
+
+        <!-- Predictions leaderboard -->
+        <div class="mt-10">
+          <h3 class="font-display text-2xl text-lime mb-4">Predictions Leaderboard</h3>
+          <div id="pred-leaderboard" class="bg-turf border border-line rounded-2xl p-5">
+            <p class="text-mist text-sm">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PLAYER OF THE WEEK ── -->
+    <div id="page-potw" class="page-view hidden">
+      <div class="max-w-3xl mx-auto px-4 py-20">
+        <h1 class="font-display text-4xl text-lime mb-2">Player of the Week</h1>
+        <p class="text-mist mb-6">Nominate and vote for the best DLS player this week</p>
+
+        <!-- Nomination form -->
+        <div class="bg-turf border border-line rounded-2xl p-5 mb-8">
+          <h3 class="font-display text-lg text-lime mb-4">Nominate a Player</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div><label class="form-label">Player Name</label><input id="potw-player" type="text" class="form-input" placeholder="e.g. Haaland" /></div>
+            <div><label class="form-label">Team</label><input id="potw-team" type="text" class="form-input" placeholder="e.g. Man City" /></div>
+            <div><label class="form-label">Rating (1-10)</label><input id="potw-rating" type="number" min="1" max="10" step="0.1" class="form-input" placeholder="9.5" /></div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Why this player?</label>
+            <textarea id="potw-reason" class="form-input" rows="2" placeholder="Hat-trick, insane dribbling, game-winning performance..."></textarea>
+          </div>
+          <button onclick="submitPOTWNomination()" class="btn-lime px-6 py-2">Nominate</button>
+        </div>
+
+        <!-- Current week's winner -->
+        <div id="potw-winner" class="hidden bg-turf border border-lime/30 rounded-2xl p-6 mb-8 text-center gold-glow">
+          <span class="text-xs uppercase tracking-widest text-lime">🏆 This Week's Winner</span>
+          <h2 id="potw-winner-name" class="font-display text-4xl text-lime mt-2"></h2>
+          <p id="potw-winner-detail" class="text-mist text-sm mt-1"></p>
+        </div>
+
+        <!-- Nominations list -->
+        <div id="potw-nominations" class="space-y-4">
+          <p class="text-mist text-center py-12">Loading nominations...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ADMIN PANEL ── -->
+    <div id="page-admin" class="page-view hidden">
+      <div class="max-w-3xl mx-auto px-4 py-20">
+        <h1 class="font-display text-4xl text-lime mb-2">Admin Panel</h1>
+        <p class="text-mist mb-6">Manage reports, featured content, and users</p>
+
+        <!-- Reports -->
+        <div class="mb-10">
+          <h3 class="font-display text-xl text-lime mb-4">📋 Reports</h3>
+          <div id="admin-reports" class="bg-turf border border-line rounded-2xl p-5">
+            <p class="text-mist text-sm">Loading reports...</p>
+          </div>
+        </div>
+
+        <!-- Users management -->
+        <div>
+          <h3 class="font-display text-xl text-lime mb-4">👥 Users</h3>
+          <div id="admin-users" class="bg-turf border border-line rounded-2xl p-5">
+            <p class="text-mist text-sm">Loading users...</p>
+          </div>
         </div>
       </div>
     </div>
@@ -576,6 +766,32 @@
     </button>
   </nav>
 
+  <!-- Report Modal -->
+  <div id="report-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+      <h3 class="font-display text-xl text-lime mb-4">Report Content</h3>
+      <p id="report-target-label" class="text-mist text-sm mb-4"></p>
+      <div class="space-y-2 mb-6">
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Spam" class="accent-yellow-400" /> <span class="text-ice text-sm">Spam</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Harassment" class="accent-yellow-400" /> <span class="text-ice text-sm">Harassment</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Inappropriate" class="accent-yellow-400" /> <span class="text-ice text-sm">Inappropriate</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Other" class="accent-yellow-400" /> <span class="text-ice text-sm">Other</span>
+        </label>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeReportModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+        <button onclick="submitReport()" class="btn-lime flex-1 py-2 text-sm">Submit</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast notification -->
   <div id="toast" class="hidden fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 z-[60] bg-turf border border-line rounded-xl px-5 py-3 text-sm shadow-2xl flex items-center gap-3 max-w-xs w-auto">
     <i data-lucide="check-circle" id="toast-icon" class="w-4 h-4 text-lime"></i>
@@ -587,5 +803,6 @@
   <!-- App modules -->
   <script type="module" src="public/js/supabase-config.js"></script>
   <script type="module" src="public/js/app.js"></script>
+  <script defer src="public/js/features.js"></script>
 </body>
 </html>
