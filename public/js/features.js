@@ -73,40 +73,40 @@ window.removeChatImage = function() {
 async function uploadChatImage(file) {
   const ext = file.name.split('.').pop();
   const path = 'chat-images/' + window.currentUser.id + '/' + Date.now() + '.' + ext;
-  const { error } = await supabase.storage.from('avatars').upload(path, file);
+  const { error } = await window.supabase.storage.from('avatars').upload(path, file);
   if (error) throw error;
-  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  return window.supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
 
 // ═══ PUBLIC PROFILES ═══
 let publicProfileData = null;
 window.viewPublicProfile = async function(userId) {
-  if (!window.currentUser) { navigate('login'); return; }
+  if (!window.currentUser) { window.navigate('login'); return; }
   try {
-    const { data: user } = await supabase.from('users').select('*').eq('uid', userId).single();
-    if (!user) { showToast('User not found', 'error'); return; }
+    const { data: user } = await window.supabase.from('users').select('*').eq('uid', userId).single();
+    if (!user) { window.showToast('User not found', 'error'); return; }
     publicProfileData = user;
     document.getElementById('pub-avatar').src = user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.username) + '&background=0f1f17&color=b5ff47';
     document.getElementById('pub-username').textContent = user.username;
     document.getElementById('pub-team').textContent = user.team ? '⚽ ' + user.team : '';
     document.getElementById('pub-bio').textContent = user.bio || '';
-    document.getElementById('pub-joined').textContent = user.joinedat ? 'Joined ' + timeAgo(new Date(user.joinedat)) : '';
-    const { count } = await supabase.from('posts').select('*', { count: 'exact', head: true }).eq('authorid', userId);
+    document.getElementById('pub-joined').textContent = user.joinedat ? 'Joined ' + window.timeAgo(new Date(user.joinedat)) : '';
+    const { count } = await window.supabase.from('posts').select('*', { count: 'exact', head: true }).eq('authorid', userId);
     document.getElementById('pub-postcount').textContent = (count || 0) + ' posts';
     const container = document.getElementById('pub-posts'); container.innerHTML = '';
-    const { data: posts } = await supabase.from('posts').select('*').eq('authorid', userId).order('created_at', { ascending: false }).limit(20);
+    const { data: posts } = await window.supabase.from('posts').select('*').eq('authorid', userId).order('created_at', { ascending: false }).limit(20);
     if (!posts || !posts.length) container.innerHTML = '<p class="text-mist text-sm">No posts yet.</p>';
-    else { posts.forEach(p => { container.innerHTML += buildPostCard(p.id, p, true); }); lucide.createIcons(); }
-    navigate('profile-public');
-  } catch (err) { showToast('Failed to load profile', 'error'); }
+    else { posts.forEach(p => { container.innerHTML += window.buildPostCard(p.id, p, true); }); lucide.createIcons(); }
+    window.navigate('profile-public');
+  } catch (err) { window.showToast('Failed to load profile', 'error'); }
 };
-window.dmFromPublicProfile = function() { if (publicProfileData) openDMFromPost(publicProfileData.uid, publicProfileData.username); };
+window.dmFromPublicProfile = function() { if (publicProfileData) window.openDMFromPost(publicProfileData.uid, publicProfileData.username); };
 
 // ═══ CLICKABLE USERNAMES ═══
 function makeUsernamesClickable() {
   document.querySelectorAll('.comment-item .text-lime.text-xs.font-medium').forEach(el => {
     if (el.dataset.clickable) return; el.dataset.clickable = '1'; el.style.cursor = 'pointer';
-    el.onclick = async () => { const { data } = await supabase.from('users').select('uid').eq('username', el.textContent.trim()).single(); if (data) viewPublicProfile(data.uid); };
+    el.onclick = async () => { const { data } = await window.supabase.from('users').select('uid').eq('username', el.textContent.trim()).single(); if (data) viewPublicProfile(data.uid); };
   });
 }
 setInterval(makeUsernamesClickable, 2000);
@@ -114,25 +114,25 @@ setInterval(makeUsernamesClickable, 2000);
 // ═══ SHARE POST LINK ═══
 window.sharePost = function(postId) {
   const url = window.location.origin + window.location.pathname + '?post=' + postId;
-  navigator.clipboard.writeText(url).then(() => showToast('Link copied! 📋')).catch(() => showToast('Failed to copy', 'error'));
+  navigator.clipboard.writeText(url).then(() => window.showToast('Link copied! 📋')).catch(() => window.showToast('Failed to copy', 'error'));
 };
 (function checkPostUrl() {
   const params = new URLSearchParams(window.location.search);
   const postId = params.get('post');
-  if (postId) { setTimeout(() => { navigate('feed'); setTimeout(() => { const el = document.getElementById('post-' + postId); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ring-2', 'ring-lime'); } }, 500); }, 500); }
+  if (postId) { setTimeout(() => { window.navigate('feed'); setTimeout(() => { const el = document.getElementById('post-' + postId); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ring-2', 'ring-lime'); } }, 500); }, 500); }
 })();
 
 // ═══ EMOJI REACTIONS ═══
 const REACTION_EMOJIS = ['🔥', '⚽', '💯', '👏', '❤️'];
 window.toggleReaction = async function(postId, emoji) {
-  if (!window.currentUser) { showToast('Log in to react', 'error'); return; }
+  if (!window.currentUser) { window.showToast('Log in to react', 'error'); return; }
   try {
-    const { data: post } = await supabase.from('posts').select('reactions').eq('id', postId).single();
+    const { data: post } = await window.supabase.from('posts').select('reactions').eq('id', postId).single();
     let reactions = (post && post.reactions) || {};
     if (!reactions[emoji]) reactions[emoji] = [];
     if (reactions[emoji].includes(window.currentUser.id)) reactions[emoji] = reactions[emoji].filter(id => id !== window.currentUser.id);
     else reactions[emoji].push(window.currentUser.id);
-    await supabase.from('posts').update({ reactions }).eq('id', postId);
+    await window.supabase.from('posts').update({ reactions }).eq('id', postId);
     var c = document.getElementById('reactions-' + postId);
     if (c) renderReactions(c, postId, reactions);
   } catch (_) {}
@@ -148,14 +148,14 @@ function renderReactions(container, postId, reactions) {
 
 // ═══ REPORT ═══
 window.reportContent = async function(type, id) {
-  if (!window.currentUser) { showToast('Log in to report', 'error'); return; }
+  if (!window.currentUser) { window.showToast('Log in to report', 'error'); return; }
   var reasons = ['Spam', 'Harassment', 'Inappropriate', 'Other'];
   var reason = prompt('Report reason:\n' + reasons.map(function(r,i) { return (i+1) + '. ' + r; }).join('\n') + '\nEnter 1-4:');
   if (!reason || reason < 1 || reason > 4) return;
   try {
-    await supabase.from('reports').insert({ reported_by: window.currentUser.id, content_type: type, content_id: id, reason: reasons[reason - 1], created_at: new Date().toISOString() });
-    showToast('Report submitted ✅');
-  } catch (_) { showToast('Failed to report', 'error'); }
+    await window.supabase.from('reports').insert({ reported_by: window.currentUser.id, content_type: type, content_id: id, reason: reasons[reason - 1], created_at: new Date().toISOString() });
+    window.showToast('Report submitted ✅');
+  } catch (_) { window.showToast('Failed to report', 'error'); }
 };
 
 // ═══ SQUADS ═══
@@ -171,31 +171,31 @@ window.createSquad = async function() {
   var formation = document.getElementById('squad-formation').value;
   var players = document.getElementById('squad-players').value.trim();
   var desc = document.getElementById('squad-desc').value.trim();
-  if (!name) { showToast('Enter a squad name', 'error'); return; }
+  if (!name) { window.showToast('Enter a squad name', 'error'); return; }
   try {
     var imageUrl = '';
     if (pendingSquadImage) {
       var ext = pendingSquadImage.name.split('.').pop();
       var path = 'squads/' + window.currentUser.id + '/' + Date.now() + '.' + ext;
-      await supabase.storage.from('avatars').upload(path, pendingSquadImage);
-      imageUrl = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+      await window.supabase.storage.from('avatars').upload(path, pendingSquadImage);
+      imageUrl = window.supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       removeSquadImage();
     }
-    await supabase.from('squads').insert({ user_id: window.currentUser.id, username: (window.currentUserDoc && window.currentUserDoc.username) || 'Anon', name: name, formation: formation, players: players, description: desc, image_url: imageUrl || null, created_at: new Date().toISOString() });
+    await window.supabase.from('squads').insert({ user_id: window.currentUser.id, username: (window.currentUserDoc && window.currentUserDoc.username) || 'Anon', name: name, formation: formation, players: players, description: desc, image_url: imageUrl || null, created_at: new Date().toISOString() });
     document.getElementById('squad-name').value = '';
     document.getElementById('squad-players').value = '';
     document.getElementById('squad-desc').value = '';
-    showToast('Squad shared! ⚽'); initSquads();
-  } catch (_) { showToast('Failed', 'error'); }
+    window.showToast('Squad shared! ⚽'); initSquads();
+  } catch (_) { window.showToast('Failed', 'error'); }
 };
 async function initSquads() {
   var grid = document.getElementById('squads-grid'); if (!grid) return;
   grid.innerHTML = '<p class="text-mist text-sm">Loading...</p>';
   try {
-    var result = await supabase.from('squads').select('*').order('created_at', { ascending: false }).limit(30);
+    var result = await window.supabase.from('squads').select('*').order('created_at', { ascending: false }).limit(30);
     var data = result.data;
     if (!data || !data.length) { grid.innerHTML = '<p class="text-mist text-sm">No squads yet.</p>'; return; }
-    grid.innerHTML = data.map(function(s) { return '<div class="post-card"><div class="flex items-center gap-3 mb-3"><img src="https://ui-avatars.com/api/?name=' + encodeURIComponent(s.username||'U') + '&background=0f1f17&color=b5ff47" class="w-8 h-8 rounded-full" /><div><p class="text-ice text-sm font-medium">' + escHtml(s.username) + '</p><p class="text-mist text-xs">' + timeAgo(new Date(s.created_at)) + '</p></div></div><h3 class="font-display text-xl text-lime mb-1">' + escHtml(s.name) + '</h3><p class="text-mist text-xs mb-2">Formation: ' + escHtml(s.formation) + '</p>' + (s.image_url ? '<img src="' + s.image_url + '" class="w-full max-h-60 object-cover rounded-lg mb-3" />' : '') + '<pre class="text-ice text-xs whitespace-pre-wrap mb-2 bg-pitch/50 p-3 rounded-lg">' + escHtml(s.players || '') + '</pre>' + (s.description ? '<p class="text-mist text-xs">' + escHtml(s.description) + '</p>' : '') + '</div>'; }).join('');
+    grid.innerHTML = data.map(function(s) { return '<div class="post-card"><div class="flex items-center gap-3 mb-3"><img src="https://ui-avatars.com/api/?name=' + encodeURIComponent(s.username||'U') + '&background=0f1f17&color=b5ff47" class="w-8 h-8 rounded-full" /><div><p class="text-ice text-sm font-medium">' + window.escHtml(s.username) + '</p><p class="text-mist text-xs">' + window.timeAgo(new Date(s.created_at)) + '</p></div></div><h3 class="font-display text-xl text-lime mb-1">' + window.escHtml(s.name) + '</h3><p class="text-mist text-xs mb-2">Formation: ' + window.escHtml(s.formation) + '</p>' + (s.image_url ? '<img src="' + s.image_url + '" class="w-full max-h-60 object-cover rounded-lg mb-3" />' : '') + '<pre class="text-ice text-xs whitespace-pre-wrap mb-2 bg-pitch/50 p-3 rounded-lg">' + window.escHtml(s.players || '') + '</pre>' + (s.description ? '<p class="text-mist text-xs">' + window.escHtml(s.description) + '</p>' : '') + '</div>'; }).join('');
   } catch (_) { grid.innerHTML = '<p class="text-coral text-xs">Failed to load.</p>'; }
 }
 
@@ -205,40 +205,40 @@ window.createPredictionMatch = async function() {
   var teamB = document.getElementById('pred-team-b').value.trim();
   var matchDate = document.getElementById('pred-match-date').value;
   var deadline = document.getElementById('pred-deadline').value;
-  if (!teamA || !teamB) { showToast('Enter both teams', 'error'); return; }
+  if (!teamA || !teamB) { window.showToast('Enter both teams', 'error'); return; }
   try {
-    await supabase.from('prediction_matches').insert({ team_a: teamA, team_b: teamB, match_date: matchDate || null, deadline: deadline || null, created_by: window.currentUser.id, created_at: new Date().toISOString() });
+    await window.supabase.from('prediction_matches').insert({ team_a: teamA, team_b: teamB, match_date: matchDate || null, deadline: deadline || null, created_by: window.currentUser.id, created_at: new Date().toISOString() });
     document.getElementById('pred-team-a').value = '';
     document.getElementById('pred-team-b').value = '';
-    showToast('Match created! 🎯'); initPredictions();
-  } catch (_) { showToast('Failed', 'error'); }
+    window.showToast('Match created! 🎯'); initPredictions();
+  } catch (_) { window.showToast('Failed', 'error'); }
 };
 window.submitPrediction = async function(matchId) {
   var a = parseInt(document.getElementById('pred-a-' + matchId).value);
   var b = parseInt(document.getElementById('pred-b-' + matchId).value);
-  if (isNaN(a) || isNaN(b)) { showToast('Enter valid scores', 'error'); return; }
+  if (isNaN(a) || isNaN(b)) { window.showToast('Enter valid scores', 'error'); return; }
   try {
-    await supabase.from('predictions').insert({ match_id: matchId, user_id: window.currentUser.id, username: (window.currentUserDoc && window.currentUserDoc.username) || 'Anon', score_a: a, score_b: b, created_at: new Date().toISOString() });
-    showToast('Predicted! 🎯'); initPredictions();
-  } catch (_) { showToast('Already predicted', 'error'); }
+    await window.supabase.from('predictions').insert({ match_id: matchId, user_id: window.currentUser.id, username: (window.currentUserDoc && window.currentUserDoc.username) || 'Anon', score_a: a, score_b: b, created_at: new Date().toISOString() });
+    window.showToast('Predicted! 🎯'); initPredictions();
+  } catch (_) { window.showToast('Already predicted', 'error'); }
 };
 async function initPredictions() {
   var c = document.getElementById('pred-matches'); if (!c) return;
   if (isAdmin()) { var af = document.getElementById('pred-admin-form'); if (af) af.classList.remove('hidden'); }
   c.innerHTML = '<p class="text-mist text-sm">Loading...</p>';
   try {
-    var result = await supabase.from('prediction_matches').select('*').order('created_at', { ascending: false }).limit(20);
+    var result = await window.supabase.from('prediction_matches').select('*').order('created_at', { ascending: false }).limit(20);
     var matches = result.data;
     if (!matches || !matches.length) { c.innerHTML = '<p class="text-mist text-sm">No matches yet.</p>'; return; }
     var html = '';
     for (var i = 0; i < matches.length; i++) {
       var m = matches[i];
-      var pr = await supabase.from('predictions').select('*').eq('match_id', m.id);
+      var pr = await window.supabase.from('predictions').select('*').eq('match_id', m.id);
       var preds = pr.data || [];
       var myPred = null;
       for (var j = 0; j < preds.length; j++) { if (preds[j].user_id === (window.currentUser && window.currentUser.id)) { myPred = preds[j]; break; } }
       var closed = m.deadline && new Date(m.deadline) < new Date();
-      html += '<div class="post-card"><div class="flex items-center justify-between mb-3"><h3 class="font-display text-xl text-lime">' + escHtml(m.team_a) + ' vs ' + escHtml(m.team_b) + '</h3>' + (m.resolved ? '<span class="text-xs px-2 py-1 rounded-full bg-lime/20 text-lime">' + m.score_a + ' - ' + m.score_b + '</span>' : '') + '</div><p class="text-mist text-xs mb-3">' + preds.length + ' predictions' + (m.deadline ? ' · Deadline: ' + new Date(m.deadline).toLocaleString() : '') + '</p>';
+      html += '<div class="post-card"><div class="flex items-center justify-between mb-3"><h3 class="font-display text-xl text-lime">' + window.escHtml(m.team_a) + ' vs ' + window.escHtml(m.team_b) + '</h3>' + (m.resolved ? '<span class="text-xs px-2 py-1 rounded-full bg-lime/20 text-lime">' + m.score_a + ' - ' + m.score_b + '</span>' : '') + '</div><p class="text-mist text-xs mb-3">' + preds.length + ' predictions' + (m.deadline ? ' · Deadline: ' + new Date(m.deadline).toLocaleString() : '') + '</p>';
       if (m.resolved) { /* show result */ }
       else if (myPred) { html += '<p class="text-mist text-xs">Your pick: ' + myPred.score_a + ' - ' + myPred.score_b + '</p>'; }
       else if (closed) { html += '<p class="text-coral text-xs">Deadline passed</p>'; }
@@ -256,21 +256,21 @@ window.nominatePOTW = async function() {
   var team = document.getElementById('potw-player-team').value.trim();
   var rating = parseInt(document.getElementById('potw-rating').value);
   var reason = document.getElementById('potw-reason').value.trim();
-  if (!name) { showToast('Enter player name', 'error'); return; }
+  if (!name) { window.showToast('Enter player name', 'error'); return; }
   try {
-    await supabase.from('potw_nominations').insert({ player_name: name, team: team, rating: rating || null, reason: reason, user_id: window.currentUser.id, username: (window.currentUserDoc && window.currentUserDoc.username) || 'Anon', week: getCurrentWeek(), created_at: new Date().toISOString() });
+    await window.supabase.from('potw_nominations').insert({ player_name: name, team: team, rating: rating || null, reason: reason, user_id: window.currentUser.id, username: (window.currentUserDoc && window.currentUserDoc.username) || 'Anon', week: getCurrentWeek(), created_at: new Date().toISOString() });
     document.getElementById('potw-player-name').value = '';
     document.getElementById('potw-reason').value = '';
-    showToast('Nominated! 🏆'); initPOTW();
-  } catch (_) { showToast('Failed', 'error'); }
+    window.showToast('Nominated! 🏆'); initPOTW();
+  } catch (_) { window.showToast('Failed', 'error'); }
 };
 window.votePOTW = async function(nomId, direction) {
   try {
     var field = direction === 'up' ? 'votes_up' : 'votes_down';
-    var result = await supabase.from('potw_nominations').select(field).eq('id', nomId).single();
+    var result = await window.supabase.from('potw_nominations').select(field).eq('id', nomId).single();
     var data = result.data;
     var obj = {}; obj[field] = (data[field] || 0) + 1;
-    await supabase.from('potw_nominations').update(obj).eq('id', nomId);
+    await window.supabase.from('potw_nominations').update(obj).eq('id', nomId);
     initPOTW();
   } catch (_) {}
 };
@@ -278,11 +278,11 @@ async function initPOTW() {
   var c = document.getElementById('potw-nominations'); if (!c) return;
   c.innerHTML = '<p class="text-mist text-sm">Loading...</p>';
   try {
-    var result = await supabase.from('potw_nominations').select('*').eq('week', getCurrentWeek()).order('votes_up', { ascending: false });
+    var result = await window.supabase.from('potw_nominations').select('*').eq('week', getCurrentWeek()).order('votes_up', { ascending: false });
     var data = result.data;
     if (!data || !data.length) { c.innerHTML = '<p class="text-mist text-sm">No nominations this week.</p>'; return; }
     c.innerHTML = data.map(function(n) {
-      return '<div class="post-card flex items-center gap-4"><div class="text-center"><button onclick="votePOTW(\'' + n.id + "','up')\" class=\"text-lg hover:scale-125 transition\">👍</button><p class=\"text-lime font-display text-xl\">" + (n.votes_up || 0) + '</p></div><div class="flex-1 min-w-0"><h4 class=\"text-ice font-medium">' + escHtml(n.player_name) + '</h4><p class=\"text-mist text-xs\">' + escHtml(n.team || '') + (n.rating ? ' ⭐ ' + n.rating : '') + '</p>' + (n.reason ? '<p class=\"text-mist text-xs mt-1">' + escHtml(n.reason) + '</p>' : '') + '<p class=\"text-mist text-xs mt-1\">by ' + escHtml(n.username) + ' · ' + timeAgo(new Date(n.created_at)) + '</p></div><div class="text-center"><button onclick="votePOTW(\'' + n.id + "','down')\" class=\"text-lg hover:scale-125 transition\">👎</button><p class=\"text-coral font-display text-xl\">" + (n.votes_down || 0) + '</p></div></div>';
+      return '<div class="post-card flex items-center gap-4"><div class="text-center"><button onclick="votePOTW(\'' + n.id + "','up')\" class=\"text-lg hover:scale-125 transition\">👍</button><p class=\"text-lime font-display text-xl\">" + (n.votes_up || 0) + '</p></div><div class="flex-1 min-w-0"><h4 class=\"text-ice font-medium">' + window.escHtml(n.player_name) + '</h4><p class=\"text-mist text-xs\">' + window.escHtml(n.team || '') + (n.rating ? ' ⭐ ' + n.rating : '') + '</p>' + (n.reason ? '<p class=\"text-mist text-xs mt-1">' + window.escHtml(n.reason) + '</p>' : '') + '<p class=\"text-mist text-xs mt-1\">by ' + window.escHtml(n.username) + ' · ' + window.timeAgo(new Date(n.created_at)) + '</p></div><div class="text-center"><button onclick="votePOTW(\'' + n.id + "','down')\" class=\"text-lg hover:scale-125 transition\">👎</button><p class=\"text-coral font-display text-xl\">" + (n.votes_down || 0) + '</p></div></div>';
     }).join('');
   } catch (_) { c.innerHTML = '<p class="text-coral text-xs">Failed.</p>'; }
 }
@@ -291,7 +291,7 @@ async function initPOTW() {
 var featurePresenceChannel = null;
 function initPresence() {
   if (!window.currentUser || featurePresenceChannel) return;
-  featurePresenceChannel = supabase.channel('online-users', { config: { presence: { key: window.currentUser.id } } });
+  featurePresenceChannel = window.supabase.channel('online-users', { config: { presence: { key: window.currentUser.id } } });
   featurePresenceChannel.on('presence', { event: 'sync' }, function() {
     var count = Object.keys(featurePresenceChannel.presenceState()).length;
     var el = document.getElementById('online-count');
@@ -309,10 +309,10 @@ async function initAdmin() {
   if (!ac) return;
   if (!isAdmin()) { ac.innerHTML = '<p class="text-coral text-center py-12">Access denied. Admin only.</p>'; return; }
   try {
-    var r1 = await supabase.from('users').select('*', { count: 'exact', head: true });
-    var r2 = await supabase.from('posts').select('*', { count: 'exact', head: true });
-    var r3 = await supabase.from('chat_messages').select('*', { count: 'exact', head: true });
-    var r4 = await supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(20);
+    var r1 = await window.supabase.from('users').select('*', { count: 'exact', head: true });
+    var r2 = await window.supabase.from('posts').select('*', { count: 'exact', head: true });
+    var r3 = await window.supabase.from('chat_messages').select('*', { count: 'exact', head: true });
+    var r4 = await window.supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(20);
     var stats = document.getElementById('admin-stats');
     if (stats) {
       var items = [{ l: 'Users', v: r1.count||0, i: 'users' }, { l: 'Posts', v: r2.count||0, i: 'file-text' }, { l: 'Messages', v: r3.count||0, i: 'message-square' }, { l: 'Reports', v: (r4.data||[]).length, i: 'flag' }];
@@ -323,12 +323,12 @@ async function initAdmin() {
     if (rl) {
       var reports = r4.data || [];
       rl.innerHTML = reports.length ? reports.map(function(r) {
-        return '<div class="flex items-center justify-between py-3 border-b border-line"><div><p class="text-ice text-sm">' + escHtml(r.reason) + ' on ' + escHtml(r.content_type) + '</p><p class="text-mist text-xs">' + escHtml(r.content_id) + ' · ' + timeAgo(new Date(r.created_at)) + '</p></div><button onclick="dismissReport(\'' + r.id + '\')" class="text-mist text-xs hover:text-coral">Dismiss</button></div>';
+        return '<div class="flex items-center justify-between py-3 border-b border-line"><div><p class="text-ice text-sm">' + window.escHtml(r.reason) + ' on ' + window.escHtml(r.content_type) + '</p><p class="text-mist text-xs">' + window.escHtml(r.content_id) + ' · ' + window.timeAgo(new Date(r.created_at)) + '</p></div><button onclick="dismissReport(\'' + r.id + '\')" class="text-mist text-xs hover:text-coral">Dismiss</button></div>';
       }).join('') : '<p class="text-mist text-sm">No reports.</p>';
     }
   } catch (_) {}
 }
-window.dismissReport = async function(id) { await supabase.from('reports').delete().eq('id', id); showToast('Dismissed'); initAdmin(); };
+window.dismissReport = async function(id) { await window.supabase.from('reports').delete().eq('id', id); window.showToast('Dismissed'); initAdmin(); };
 
 // ═══ BOOTSTRAP ═══
 document.addEventListener('DOMContentLoaded', function() {

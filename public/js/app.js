@@ -5,6 +5,8 @@
 // ═══════════════════════════════════════════════════════════
 
 import { supabase, getCurrentUser, onAuthChange } from "./supabase-config.js";
+window.supabase = supabase; // expose for features.js
+window.onAuthChange = onAuthChange; // expose for features.js
 
 // ── Global state ──────────────────────────────────────────
 let currentUser   = null;   // Supabase auth user
@@ -526,6 +528,7 @@ window.submitPost = async function () {
 
 /** Build HTML for a post card */
 function buildPostCard(postId, p, isProfile = false) {
+  window.buildPostCard = buildPostCard; // expose for features.js
   const avatarSrc  = p.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.authorname || "U")}&background=0f1f17&color=b5ff47`;
   const timestamp  = p.created_at ? timeAgo(new Date(p.created_at)) : "just now";
   const isMyPost   = currentUser && p.authorid === currentUser.id;
@@ -1175,6 +1178,7 @@ document.addEventListener("click", (e) => {
 
 /** Show toast notification */
 function showToast(msg, type = "success") {
+  window.showToast = showToast; // expose for features.js
   const toast  = document.getElementById("toast");
   const msgEl  = document.getElementById("toast-msg");
   const iconEl = document.getElementById("toast-icon");
@@ -1198,6 +1202,7 @@ function showAuthError(el, msg) {
 
 /** Sanitise for HTML injection */
 function escHtml(str) {
+  window.escHtml = escHtml; // expose for features.js
   if (!str) return "";
   return str
     .replace(/&/g, "&amp;")
@@ -1209,6 +1214,7 @@ function escHtml(str) {
 
 /** Human-readable time ago */
 function timeAgo(date) {
+  window.timeAgo = timeAgo; // expose for features.js
   if (!date) return "";
   const now   = new Date();
   const diff  = Math.floor((now - date) / 1000);
