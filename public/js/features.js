@@ -78,6 +78,38 @@ async function uploadChatImage(file) {
   return window.supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
 
+// Override sendChatMessage to include image
+(function() {
+  const origSend = window.sendChatMessage;
+  window.sendChatMessage = async function() {
+    var input = document.getElementById('chat-input');
+    var message = input.value.trim();
+    if (!message && !pendingChatImage) return;
+    if (!window.currentUser) return;
+    input.value = '';
+    var imageUrl = '';
+    try {
+      if (pendingChatImage) {
+        window.showToast('Uploading image...');
+        imageUrl = await uploadChatImage(pendingChatImage);
+        window.removeChatImage();
+      }
+      var { error } = await window.supabase.from('chat_messages').insert({
+        authorid: window.currentUser.id,
+        authorname: (window.currentUserDoc && window.currentUserDoc.username) || 'Anonymous',
+        authoravatar: (window.currentUserDoc && window.currentUserDoc.avatar) || '',
+        content: message,
+        imageurl: imageUrl || null,
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+    } catch (err) {
+      input.value = message;
+      window.showToast('Failed to send', 'error');
+    }
+  };
+})();
+
 // ═══ PUBLIC PROFILES ═══
 let publicProfileData = null;
 window.viewPublicProfile = async function(userId) {

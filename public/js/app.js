@@ -546,13 +546,11 @@ function buildPostCard(postId, p, isProfile = false) {
           </div>
 
         </div>
-        <button onclick="sharePost('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition"><i data-lucide="share-2" class="w-3.5 h-3.5"></i></button>
-        <button onclick="reportContent('post','${postId}')" class="flex items-center gap-1.5 hover:text-coral transition"><i data-lucide="flag" class="w-3.5 h-3.5"></i></button>
         ${isMyPost ? `<button onclick="deletePost('${postId}')" class="text-coral hover:text-white text-xs flex items-center gap-1 ml-2 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button>` : ""}
       </div>
       <p class="text-ice text-sm leading-relaxed mb-4 whitespace-pre-wrap">${escHtml(p.content)}</p>
       ${p.imageurl ? `<img src="${p.imageurl}" alt="Post image" class="w-full max-h-80 object-cover rounded-lg mb-3" />` : ""}
-      <div class="flex items-center gap-6 text-xs text-mist border-t border-line pt-3">
+      <div class="flex items-center gap-4 sm:gap-6 text-xs text-mist border-t border-line pt-3 flex-wrap">
         <button onclick="toggleLike('${postId}')"
           class="like-btn flex items-center gap-1.5 hover:text-lime transition ${liked ? "text-lime" : ""}">
           <i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i> ${likeCount}
@@ -560,7 +558,9 @@ function buildPostCard(postId, p, isProfile = false) {
         <button onclick="toggleComments('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition">
           <i data-lucide="message-square" class="w-3.5 h-3.5"></i> ${p.commentcount || 0}
         </button>
-        <button onclick="openDMFromPost('${p.authorid}','${escHtml(p.authorname)}')" class="flex items-center gap-1.5 hover:text-lime transition ml-auto">
+        <button onclick="sharePost('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition"><i data-lucide="share-2" class="w-3.5 h-3.5"></i></button>
+        <button onclick="reportContent('post','${postId}')" class="flex items-center gap-1.5 hover:text-coral transition"><i data-lucide="flag" class="w-3.5 h-3.5"></i></button>
+        <button onclick="openDMFromPost('${p.authorid}','${escHtml(p.authorname)}')" class="flex items-center gap-1.5 hover:text-lime transition">
           <i data-lucide="mail" class="w-3.5 h-3.5"></i> DM
         </button>
       </div>
