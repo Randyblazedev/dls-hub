@@ -57,27 +57,6 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS reactions jsonb DEFAULT '{}';
 const ADMIN_EMAILS = ['asonganyirandy143@gmail.com'];
 function isAdmin() { return window.currentUser && ADMIN_EMAILS.includes(window.currentUser.email); }
 
-// ═══ CHAT IMAGES ═══
-let pendingChatImage = null;
-window.previewChatImage = function(e) {
-  const file = e.target.files[0]; if (!file) return;
-  pendingChatImage = file;
-  const reader = new FileReader();
-  reader.onload = ev => { document.getElementById('chat-preview-img').src = ev.target.result; document.getElementById('chat-image-preview').classList.remove('hidden'); };
-  reader.readAsDataURL(file);
-};
-window.removeChatImage = function() {
-  pendingChatImage = null; document.getElementById('chat-image-input').value = '';
-  document.getElementById('chat-image-preview').classList.add('hidden');
-};
-async function uploadChatImage(file) {
-  const ext = file.name.split('.').pop();
-  const path = 'chat-images/' + window.currentUser.id + '/' + Date.now() + '.' + ext;
-  const { error } = await window.supabase.storage.from('avatars').upload(path, file);
-  if (error) throw error;
-  return window.supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
-}
-
 // Chat image functions (sendChatMessage is now in app.js with image support)
 window.previewChatImage = function(e) {
   var file = e.target.files[0]; if (!file) return;
