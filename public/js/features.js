@@ -78,37 +78,42 @@ async function uploadChatImage(file) {
   return window.supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
 }
 
-// Override sendChatMessage to include image
-(function() {
-  const origSend = window.sendChatMessage;
-  window.sendChatMessage = async function() {
-    var input = document.getElementById('chat-input');
-    var message = input.value.trim();
-    if (!message && !pendingChatImage) return;
-    if (!window.currentUser) return;
-    input.value = '';
-    var imageUrl = '';
-    try {
-      if (pendingChatImage) {
-        window.showToast('Uploading image...');
-        imageUrl = await uploadChatImage(pendingChatImage);
-        window.removeChatImage();
-      }
-      var { error } = await window.supabase.from('chat_messages').insert({
-        authorid: window.currentUser.id,
-        authorname: (window.currentUserDoc && window.currentUserDoc.username) || 'Anonymous',
-        authoravatar: (window.currentUserDoc && window.currentUserDoc.avatar) || '',
-        content: message,
-        imageurl: imageUrl || null,
-        created_at: new Date().toISOString(),
-      });
-      if (error) throw error;
-    } catch (err) {
-      input.value = message;
-      window.showToast('Failed to send', 'error');
+// Chat image functions (sendChatMessage is now in app.js with image support)
+window.previewChatImage = function(e) {
+  var file = e.target.files[0]; if (!file) return;
+  window._pendingChatImage = file;
+  var reader = new FileReader();
+  reader.onload = function(ev) { document.getElementById('chat-preview-img').src = ev.target.result; document.getElementById('chat-image-preview').classList.remove('hidden'); };
+  reader.readAsDataURL(file);
+};
+window.removeChatImage = function() {
+  window._pendingChatImage = null;
+  if (document.getElementById('chat-image-input')) document.getElementById('chat-image-input').value = '';
+  if (document.getElementById('chat-image-preview')) document.getElementById('chat-image-preview').classList.add('hidden');
+};
+
+// Themed confirm modal
+window.showConfirm = function(msg) {
+  return new Promise(function(resolve) {
+    var modal = document.getElementById('confirm-modal');
+    var msgEl = document.getElementById('confirm-msg');
+    var okBtn = document.getElementById('confirm-ok');
+    var cancelBtn = document.getElementById('confirm-cancel');
+    if (!modal) { resolve(confirm(msg)); return; }
+    msgEl.textContent = msg;
+    modal.classList.remove('hidden');
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
     }
-  };
-})();
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+};
 
 // ═══ PUBLIC PROFILES ═══
 let publicProfileData = null;

@@ -608,7 +608,7 @@ window.toggleLike = async function (postId) {
 
 window.deletePost = async function (postId) {
   if (!currentUser) return;
-  if (!confirm("Delete this post?")) return;
+  if (!await window.showConfirm("Delete this post?")) return;
 
   try {
     const { error } = await supabase.from("posts").delete().eq("id", postId);
@@ -623,7 +623,7 @@ window.deletePost = async function (postId) {
 // ── Delete Comment ──
 window.deleteComment = async function (commentId) {
   if (!currentUser) return;
-  if (!confirm("Delete this comment?")) return;
+  if (!await window.showConfirm("Delete this comment?")) return;
 
   try {
     const { error } = await supabase.from("comments").delete().eq("id", commentId);
@@ -638,7 +638,7 @@ window.deleteComment = async function (commentId) {
 // ── Delete Chat Message ──
 window.deleteChatMessage = async function (msgId) {
   if (!currentUser) return;
-  if (!confirm("Delete this message?")) return;
+  if (!await window.showConfirm("Delete this message?")) return;
 
   try {
     const { error } = await supabase.from("chat_messages").delete().eq("id", msgId);
@@ -653,7 +653,7 @@ window.deleteChatMessage = async function (msgId) {
 // ── Delete DM Message ──
 window.deleteDMMessage = async function (msgId) {
   if (!currentUser) return;
-  if (!confirm("Delete this DM?")) return;
+  if (!await window.showConfirm("Delete this DM?")) return;
 
   try {
     const { error } = await supabase.from("dm_messages").delete().eq("id", msgId);
@@ -816,23 +816,38 @@ function appendChatMessage(container, m) {
   container.appendChild(wrapper);
 }
 
+window._pendingChatImage = null;
 window.sendChatMessage = async function () {
   const input   = document.getElementById("chat-input");
   const message = input.value.trim();
-  if (!message || !currentUser) return;
+  if (!message && !window._pendingChatImage) return;
+  if (!currentUser) return;
 
   input.value = "";
   try {
+    let imageUrl = null;
+    if (window._pendingChatImage) {
+      showToast("Uploading image...");
+      const ext = window._pendingChatImage.name.split(".").pop();
+      const path = "chat-images/" + currentUser.id + "/" + Date.now() + "." + ext;
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, window._pendingChatImage);
+      if (upErr) throw upErr;
+      imageUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+      window._pendingChatImage = null;
+      const preview = document.getElementById("chat-image-preview");
+      if (preview) preview.classList.add("hidden");
+    }
     const { error } = await supabase.from("chat_messages").insert({
       authorid:     currentUser.id,
       authorname:   currentUserDoc?.username || "Anonymous",
       authoravatar: currentUserDoc?.avatar   || "",
       content:      message,
+      imageurl:     imageUrl,
       created_at:   new Date().toISOString(),
     });
     if (error) throw error;
   } catch (err) {
-    input.value = message; // restore on failure
+    input.value = message;
     showToast("Failed to send message", "error");
   }
 };
