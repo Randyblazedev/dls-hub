@@ -312,7 +312,7 @@ function initPresence() {
     var count = Object.keys(featurePresenceChannel.presenceState()).length;
     var el = document.getElementById('online-count');
     var num = document.getElementById('online-num');
-    if (el && num) { num.textContent = count; el.classList.toggle('hidden', count < 2); }
+    if (el && num) { var others = count - 1; num.textContent = others; el.classList.toggle('hidden', others < 1); }
   });
   featurePresenceChannel.subscribe(function(status) {
     if (status === 'SUBSCRIBED') featurePresenceChannel.track({ user_id: window.currentUser.id, username: window.currentUserDoc && window.currentUserDoc.username, online_at: new Date().toISOString() });
