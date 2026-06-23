@@ -325,7 +325,7 @@ async function loadProfilePosts(uid) {
     const { data, error } = await supabase
       .from("posts").select("*")
       .eq("authorid", uid)
-      .order("timestamp", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(20);
 
     if (error) throw error;
@@ -429,7 +429,7 @@ function initFeed() {
     try {
       const { data, error } = await supabase
         .from("posts").select("*")
-        .order("timestamp", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(30);
       if (error) throw error;
 
@@ -506,7 +506,7 @@ window.submitPost = async function () {
       authoravatar:   currentUserDoc?.avatar   || "",
       content,
       imageurl:   imageUrl,
-      timestamp:     new Date().toISOString(),
+      created_at:     new Date().toISOString(),
       likes:          [],
       commentcount:   0,
     });
@@ -530,7 +530,7 @@ window.submitPost = async function () {
 function buildPostCard(postId, p, isProfile = false) {
   window.buildPostCard = buildPostCard; // expose for features.js
   const avatarSrc  = p.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.authorname || "U")}&background=0f1f17&color=b5ff47`;
-  const timestamp  = p.timestamp ? timeAgo(new Date(p.timestamp)) : "just now";
+  const timestamp  = p.created_at ? timeAgo(new Date(p.created_at)) : "just now";
   const isMyPost   = currentUser && p.authorid === currentUser.id;
   const likeCount  = p.likes?.length || 0;
   const liked      = currentUser && p.likes?.includes(currentUser.id);
@@ -682,7 +682,7 @@ async function loadComments(postId) {
     const { data, error } = await supabase
       .from("comments").select("*")
       .eq("postid", postId)
-      .order("timestamp", { ascending: true })
+      .order("created_at", { ascending: true })
       .limit(20);
 
     if (error) throw error;
@@ -703,7 +703,7 @@ async function loadComments(postId) {
             <div class="flex items-center justify-between">
               <div>
                 <span class="text-lime text-xs font-medium mr-2">${escHtml(c.authorname)}</span>
-                <span class="text-mist text-xs">${timeAgo(c.timestamp ? new Date(c.timestamp) : new Date())}</span>
+                <span class="text-mist text-xs">${timeAgo(c.created_at ? new Date(c.created_at) : new Date())}</span>
               </div>
               ${isMine ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
             </div>
@@ -728,7 +728,7 @@ window.submitComment = async function (postId) {
       authorid:     currentUser.id,
       authorname:   currentUserDoc?.username || "Anonymous",
       content,
-      timestamp:   new Date().toISOString(),
+      created_at:   new Date().toISOString(),
     });
     if (error) throw error;
 
@@ -767,7 +767,7 @@ function initChat() {
     try {
       const { data, error } = await supabase
         .from("chat_messages").select("*")
-        .order("timestamp", { ascending: true })
+        .order("created_at", { ascending: true })
         .limit(100);
       if (error) throw error;
       if (!data) return;
@@ -794,7 +794,7 @@ function initChat() {
 function appendChatMessage(container, m) {
   const isMine    = currentUser && m.authorid === currentUser.id;
   const avatarSrc = m.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.authorname||"U")}&background=0f1f17&color=b5ff47&size=40`;
-  const ts        = m.timestamp ? timeAgo(new Date(m.timestamp)) : "";
+  const ts        = m.created_at ? timeAgo(new Date(m.created_at)) : "";
 
   const wrapper = document.createElement("div");
   wrapper.id = `chat-msg-${m.id}`;
@@ -843,7 +843,7 @@ window.sendChatMessage = async function () {
       authoravatar: currentUserDoc?.avatar   || "",
       content:      message,
       imageurl:     imageUrl,
-      timestamp:   new Date().toISOString(),
+      created_at:   new Date().toISOString(),
     });
     if (error) throw error;
   } catch (err) {
@@ -869,7 +869,7 @@ async function loadDMConversations() {
     const { data, error } = await supabase
       .from("dms").select("*")
       .or(`user1id.eq.${currentUser.id},user2id.eq.${currentUser.id}`)
-      .order("timestamp", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(20);
 
     if (error) throw error;
@@ -960,7 +960,7 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
       user1id:    [currentUser.id, otherId].sort()[0],
       user2id:    [currentUser.id, otherId].sort()[1],
       lastmsg:    "",
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
   }
 
@@ -972,7 +972,7 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
     const { data, error } = await supabase
       .from("dm_messages").select("*")
       .eq("dmid", dmId)
-      .order("timestamp", { ascending: true })
+      .order("created_at", { ascending: true })
       .limit(50);
 
     if (error || !data) return;
@@ -994,7 +994,7 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
         <div>
           <div class="${isMine ? "bubble-me" : "bubble-other"}">${escHtml(m.content)}</div>
           <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
-            <p class="text-xs text-mist">${timeAgo(m.timestamp ? new Date(m.timestamp) : new Date())}</p>
+            <p class="text-xs text-mist">${timeAgo(m.created_at ? new Date(m.created_at) : new Date())}</p>
             ${isMine ? `<button onclick="deleteDMMessage('${m.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
           </div>
         </div>`;
@@ -1024,7 +1024,7 @@ window.sendDM = async function () {
       dmid:      dmId,
       senderid:   currentUser.id,
       content:    message,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     });
     if (error) throw error;
 
