@@ -353,16 +353,24 @@ function waitForAppReady(cb) {
   var tries = 0;
   var check = setInterval(function() {
     tries++;
-    if (window.onAuthChange || tries > 50) { clearInterval(check); cb(); }
+    if ((window.onAuthChange && window.supabase) || tries > 100) { clearInterval(check); cb(); }
   }, 100);
+}
+function waitForUser(cb, tries) {
+  tries = tries || 0;
+  if (window.currentUser) { cb(); return; }
+  if (tries > 50) { cb(); return; }
+  setTimeout(function() { waitForUser(cb, tries + 1); }, 200);
 }
 document.addEventListener('DOMContentLoaded', function() {
   waitForAppReady(function() {
-    // Init presence if already logged in
-    if (window.currentUser) initPresence();
-    // Watch for auth changes
-    window.onAuthChange(function(user) {
-      if (user) setTimeout(initPresence, 1000);
+    waitForUser(function() {
+      // Init presence if already logged in
+      if (window.currentUser) initPresence();
+      // Watch for auth changes
+      window.onAuthChange(function(user) {
+        if (user) setTimeout(initPresence, 500);
+      });
     });
   });
 });

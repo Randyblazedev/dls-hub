@@ -185,6 +185,9 @@ onAuthChange(async (user) => {
     avatarMenu.classList.remove("hidden");
     notifBtn.classList.remove("hidden");
     mobileNavAuth.classList.remove("hidden");
+    // Show admin link if user is admin
+    var adminLink = document.getElementById("admin-nav-link");
+    if (adminLink) { adminLink.classList.toggle("hidden", !["asonganyirandy143@gmail.com"].includes(user.email)); }
     mobileNavAuth.style.display = "flex";
 
     loadHomeStats();

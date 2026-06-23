@@ -81,6 +81,8 @@
       <button onclick="toggleSound()" class="p-2 text-mist hover:text-lime transition" title="Toggle sound">
         <i data-lucide="volume-2" id="sound-icon" class="w-5 h-5"></i>
       </button>
+      <!-- Online status -->
+      <span id="online-count" class="text-xs text-mist bg-turf border border-line rounded-full px-2 py-1 hidden"><span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span><span id="online-num">0</span> online</span>
       <!-- Theme toggle (always visible) -->
       <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
         <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
@@ -102,6 +104,7 @@
           </button>
           <div id="avatar-dropdown" class="hidden absolute right-0 mt-2 w-44 bg-turf border border-line rounded-xl shadow-xl text-sm">
             <button onclick="navigate('profile')"  class="w-full text-left px-4 py-2.5 hover:text-lime transition">My Profile</button>
+            <button id="admin-nav-link" onclick="navigate('admin')" class="w-full text-left px-4 py-2.5 hover:text-lime transition hidden">Admin</button>
             <button onclick="handleSignOut()"       class="w-full text-left px-4 py-2.5 text-coral hover:opacity-80 transition">Sign Out</button>
           </div>
         </div>
@@ -385,7 +388,6 @@
       <div class="max-w-3xl mx-auto px-4 pt-20 pb-24 flex flex-col" style="height:calc(100vh - 56px)">
         <div class="flex items-center justify-between mb-4">
         <h1 class="font-display text-4xl text-lime">Community Chat</h1>
-        <span id="online-count" class="text-xs text-mist bg-turf border border-line rounded-full px-3 py-1 hidden"><span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1.5 animate-pulse"></span><span id="online-num">0</span> online</span>
       </div>
         <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 mb-4 pr-1 min-h-0">
           <div class="text-center text-mist py-12">
