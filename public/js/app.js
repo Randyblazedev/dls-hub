@@ -1305,3 +1305,14 @@ document.addEventListener("DOMContentLoaded", () => {
   lucide.createIcons();
   navigate("home");
 });
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(() => {
+        console.log("DLS Hub SW Registered");
+      })
+      .catch((err) => {
+        console.log("SW failed:", err);
+      });
+  });
+}
