@@ -222,6 +222,14 @@ onAuthChange(async (user) => {
     stopNotifications();
     if (window.cleanupPresence) window.cleanupPresence();
 
+    // Reset home page to guest state
+    const guestBtns   = document.getElementById("home-guest-btns");
+    const authBtns    = document.getElementById("home-auth-btns");
+    const statsSection = document.getElementById("home-stats-section");
+    if (guestBtns)    guestBtns.classList.remove("hidden");
+    if (authBtns)     authBtns.classList.add("hidden");
+    if (statsSection) statsSection.classList.add("hidden");
+
     navigate("home");
   }
 });
@@ -1379,14 +1387,31 @@ async function initLeaderboard(type = "posts") {
 // ═══════════════════════════════════════════════════════════
 
 async function loadHomeStats() {
+  // Show/hide home page sections based on auth state
+  const guestBtns  = document.getElementById("home-guest-btns");
+  const authBtns   = document.getElementById("home-auth-btns");
+  const statsSection = document.getElementById("home-stats-section");
+
+  if (currentUser) {
+    if (guestBtns)   guestBtns.classList.add("hidden");
+    if (authBtns)    { authBtns.classList.remove("hidden"); authBtns.classList.add("flex"); }
+    if (statsSection) statsSection.classList.remove("hidden");
+  } else {
+    if (guestBtns)   guestBtns.classList.remove("hidden");
+    if (authBtns)    authBtns.classList.add("hidden");
+    if (statsSection) statsSection.classList.add("hidden");
+    return; // don't bother fetching counts for guests
+  }
+
   try {
     const [usersRes, postsRes, msgsRes] = await Promise.all([
+      // Only count non-banned users
       supabase.from("public_profiles").select("*", { count: "exact", head: true }),
       supabase.from("posts").select("*", { count: "exact", head: true }),
       supabase.from("chat_messages").select("*", { count: "exact", head: true }),
     ]);
 
-    const fmt = n => n >= 1000 ? (n/1000).toFixed(1) + "k" : n.toString();
+    const fmt = n => n >= 1000 ? (n / 1000).toFixed(1) + "k" : (n || 0).toString();
     document.getElementById("stat-users").textContent = fmt(usersRes.count || 0);
     document.getElementById("stat-posts").textContent = fmt(postsRes.count || 0);
     document.getElementById("stat-msgs").textContent  = fmt(msgsRes.count || 0);

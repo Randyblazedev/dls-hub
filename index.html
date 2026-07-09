@@ -176,15 +176,21 @@
           <p class="text-mist text-lg md:text-xl max-w-xl mx-auto mb-10 leading-relaxed">
             Trade tactics, show off your squad, climb the global leaderboard, and talk DLS with thousands of managers worldwide.
           </p>
-          <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <!-- Logged OUT: show Join + Leaderboards -->
+          <div id="home-guest-btns" class="flex flex-col sm:flex-row gap-4 justify-center">
             <button onclick="navigate('signup')" class="btn-lime text-base px-8 py-3">Join the Hub</button>
+            <button onclick="navigate('leaderboards')" class="btn-ghost text-base px-8 py-3">View Leaderboards</button>
+          </div>
+          <!-- Logged IN: show Go to Feed -->
+          <div id="home-auth-btns" class="hidden flex flex-col sm:flex-row gap-4 justify-center">
+            <button onclick="navigate('feed')" class="btn-lime text-base px-8 py-3">Go to Feed</button>
             <button onclick="navigate('leaderboards')" class="btn-ghost text-base px-8 py-3">View Leaderboards</button>
           </div>
         </div>
       </section>
 
-      <!-- Stats strip -->
-      <section class="border-y border-line bg-turf">
+      <!-- Stats strip — only visible when logged in -->
+      <section id="home-stats-section" class="hidden border-y border-line bg-turf">
         <div class="max-w-5xl mx-auto grid grid-cols-3 divide-x divide-line">
           <div class="py-10 text-center">
             <p id="stat-users" class="font-display text-4xl text-lime">—</p>
