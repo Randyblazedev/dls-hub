@@ -18,6 +18,9 @@
   <meta name="twitter:image" content="https://dlshub.vercel.app/public/images/logo.jpg" />
   <!-- Favicon -->
   <link rel="icon" type="image/jpeg" href="/public/images/logo.jpg" />
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0f1f17" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -77,6 +80,10 @@
       </div>
 
       <!-- Right side: auth buttons OR avatar -->
+      <!-- Install app (PWA) -->
+      <button id="install-btn" onclick="installApp()" class="hidden items-center gap-1.5 btn-lime px-3 py-1.5 text-xs" title="Install DLS Hub">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i> Install
+      </button>
       <!-- Sound toggle -->
       <button onclick="toggleSound()" class="p-2 text-mist hover:text-lime transition" title="Toggle sound">
         <i data-lucide="volume-2" id="sound-icon" class="w-5 h-5"></i>
@@ -385,7 +392,7 @@
 
     <!-- ── COMMUNITY CHAT ── -->
     <div id="page-chat" class="page-view hidden">
-      <div class="max-w-3xl mx-auto px-4 pt-20 pb-24 flex flex-col" style="height:calc(100vh - 56px)">
+      <div class="chat-container max-w-3xl mx-auto px-4 pt-20 pb-4 flex flex-col">
         <div class="flex items-center justify-between mb-4">
         <h1 class="font-display text-4xl text-lime">Community Chat</h1>
       </div>
@@ -398,6 +405,13 @@
         <div id="chat-image-preview" class="hidden mb-2 relative inline-block">
           <img id="chat-preview-img" class="max-h-32 rounded-lg object-cover" />
           <button onclick="removeChatImage()" class="absolute top-1 right-1 bg-coral text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
+        </div>
+        <div id="chat-reply-preview" class="hidden mb-2 bg-turf border border-line border-l-2 border-l-lime rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-lime text-xs font-medium">Replying to <span id="chat-reply-author"></span></p>
+            <p id="chat-reply-text" class="text-mist text-xs truncate"></p>
+          </div>
+          <button onclick="cancelChatReply()" class="text-mist hover:text-coral text-xs shrink-0">✕</button>
         </div>
         <div class="flex gap-2 mt-auto items-end">
           <label class="cursor-pointer text-mist hover:text-lime transition flex items-center justify-center w-10 h-10 rounded-xl bg-turf border border-line shrink-0">
@@ -436,11 +450,20 @@
             </div>
             <div id="dm-messages" class="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
             </div>
-            <div id="dm-input-area" class="hidden p-4 border-t border-line flex gap-3">
-              <input id="dm-input" type="text" class="form-input flex-1 text-base" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendDM()" />
-              <button onclick="sendDM()" class="btn-lime px-4 py-2">
-                <i data-lucide="send" class="w-4 h-4"></i>
-              </button>
+            <div id="dm-input-area" class="hidden p-4 border-t border-line">
+              <div id="dm-reply-preview" class="hidden mb-2 bg-turf border border-line border-l-2 border-l-lime rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-lime text-xs font-medium">Replying to <span id="dm-reply-author"></span></p>
+                  <p id="dm-reply-text" class="text-mist text-xs truncate"></p>
+                </div>
+                <button onclick="cancelDMReply()" class="text-mist hover:text-coral text-xs shrink-0">✕</button>
+              </div>
+              <div class="flex gap-3">
+                <input id="dm-input" type="text" class="form-input flex-1 text-base" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendDM()" />
+                <button onclick="sendDM()" class="btn-lime px-4 py-2">
+                  <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -645,6 +668,22 @@
           <h3 class="font-display text-xl text-lime mb-4">📋 Reports</h3>
           <div id="admin-reports" class="bg-turf border border-line rounded-2xl p-5">
             <p class="text-mist text-sm">Loading reports...</p>
+          </div>
+        </div>
+
+        <!-- Posts management -->
+        <div class="mb-10">
+          <h3 class="font-display text-xl text-lime mb-4">📝 All Posts</h3>
+          <div id="admin-posts" class="bg-turf border border-line rounded-2xl p-5 space-y-3 max-h-96 overflow-y-auto">
+            <p class="text-mist text-sm">Loading posts...</p>
+          </div>
+        </div>
+
+        <!-- Messages management -->
+        <div class="mb-10">
+          <h3 class="font-display text-xl text-lime mb-4">💬 Recent Chat Messages</h3>
+          <div id="admin-messages" class="bg-turf border border-line rounded-2xl p-5 space-y-3 max-h-96 overflow-y-auto">
+            <p class="text-mist text-sm">Loading messages...</p>
           </div>
         </div>
 

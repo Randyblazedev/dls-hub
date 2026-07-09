@@ -63,27 +63,26 @@ window.toggleSound = function () {
  */
 function subscribeChanges(table, fetchFn, opts = {}) {
   let pollTimer  = null;
-  let live       = false;
+  let live       = false; // only true once a REAL postgres_changes event has fired
   let channel    = null;
   const interval = opts.interval || 5000;
+  const chanName = `rt:${table}:${Math.random().toString(36).slice(2)}`; // avoid name collisions across DM threads
 
   try {
     channel = supabase
-      .channel(`rt:${table}`)
+      .channel(chanName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table, filter: opts.filter || undefined },
-        () => fetchFn()
+        () => { live = true; fetchFn(); }
       )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          live = true;
-          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-        }
-      });
+      .subscribe();
   } catch (_) { /* Realtime unavailable — rely on polling */ }
 
-  pollTimer = setInterval(() => { if (!live) fetchFn(); }, interval);
+  // Safety-net poll ALWAYS runs; we just skip a fetch if realtime just delivered one,
+  // so a silently-broken realtime channel (e.g. table not in publication, or RLS
+  // blocking replication) can never leave the UI stuck until manual refresh.
+  pollTimer = setInterval(() => { fetchFn(); }, interval);
 
   return () => {
     if (channel) { supabase.removeChannel(channel); channel = null; }
@@ -102,6 +101,11 @@ window.navigate = function (page) {
   if (protected_.includes(page) && !currentUser) {
     navigate("login");
     showToast("Please log in first", "error");
+    return;
+  }
+  if (page === "admin" && !currentUserDoc?.is_admin) {
+    navigate(currentUser ? "feed" : "login");
+    showToast("Admins only", "error");
     return;
   }
 
@@ -174,6 +178,14 @@ onAuthChange(async (user) => {
     currentUserDoc = row || null;
     window.currentUserDoc = currentUserDoc;
 
+    // Enforce ban server-side truth: banned users get signed out immediately,
+    // even if they still have a valid session token.
+    if (currentUserDoc?.banned) {
+      showToast("Your account has been suspended.", "error");
+      await supabase.auth.signOut();
+      return;
+    }
+
     // Update nav avatar
     const avatarUrl = currentUserDoc?.avatar ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserDoc?.username || "User")}&background=0f1f17&color=b5ff47`;
@@ -185,12 +197,14 @@ onAuthChange(async (user) => {
     avatarMenu.classList.remove("hidden");
     notifBtn.classList.remove("hidden");
     mobileNavAuth.classList.remove("hidden");
-    // Show admin link if user is admin
+    // Show admin link only if the DATABASE says so (server-enforced via RLS),
+    // not just a hardcoded client-side email check.
     var adminLink = document.getElementById("admin-nav-link");
-    if (adminLink) { adminLink.classList.toggle("hidden", !["asonganyirandy143@gmail.com"].includes(user.email)); }
+    if (adminLink) { adminLink.classList.toggle("hidden", !currentUserDoc?.is_admin); }
     mobileNavAuth.style.display = "flex";
 
     loadHomeStats();
+    startNotifications();
   } else {
     currentUserDoc = null;
     window.currentUserDoc = null;
@@ -199,6 +213,9 @@ onAuthChange(async (user) => {
     avatarMenu.classList.add("hidden");
     notifBtn.classList.add("hidden");
     mobileNavAuth.classList.add("hidden");
+
+    stopNotifications();
+    if (window.cleanupPresence) window.cleanupPresence();
 
     navigate("home");
   }
@@ -535,6 +552,7 @@ function buildPostCard(postId, p, isProfile = false) {
   const avatarSrc  = p.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.authorname || "U")}&background=0f1f17&color=b5ff47`;
   const timestamp  = p.created_at ? timeAgo(new Date(p.created_at)) : "just now";
   const isMyPost   = currentUser && p.authorid === currentUser.id;
+  const canDelete  = isMyPost || currentUserDoc?.is_admin;
   const likeCount  = p.likes?.length || 0;
   const liked      = currentUser && p.likes?.includes(currentUser.id);
 
@@ -549,7 +567,7 @@ function buildPostCard(postId, p, isProfile = false) {
           </div>
 
         </div>
-        ${isMyPost ? `<button onclick="deletePost('${postId}')" class="text-coral hover:text-white text-xs flex items-center gap-1 ml-2 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button>` : ""}
+        ${canDelete ? `<button onclick="deletePost('${postId}')" class="text-coral hover:text-white text-xs flex items-center gap-1 ml-2 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button>` : ""}
       </div>
       <p class="text-ice text-sm leading-relaxed mb-4 whitespace-pre-wrap">${escHtml(p.content)}</p>
       ${p.imageurl ? `<img src="${p.imageurl}" alt="Post image" class="w-full max-h-80 object-cover rounded-lg mb-3" />` : ""}
@@ -597,7 +615,7 @@ window.toggleLike = async function (postId) {
   } else {
     newLikes = [...currentLikes, uid];
     if (post.authorid !== uid) {
-      pushNotification(`${currentUserDoc?.username} liked your post!`);
+      pushNotification(post.authorid, `${currentUserDoc?.username} liked your post!`, postId);
     }
   }
 
@@ -697,8 +715,9 @@ async function loadComments(postId) {
     }
 
     data.forEach(c => {
-      const avSrc = c.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.authorname||"U")}&background=0f1f17&color=b5ff47&size=40`;
+      const avSrc = c.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.authorname||"U")}&background=0f1f17&color=b5ff47&size=40`;
       const isMine = currentUser && c.authorid === currentUser.id;
+      const canDeleteComment = isMine || currentUserDoc?.is_admin;
       listEl.innerHTML += `
         <div class="comment-item" id="comment-${c.id}">
           <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
@@ -708,7 +727,7 @@ async function loadComments(postId) {
                 <span class="text-lime text-xs font-medium mr-2">${escHtml(c.authorname)}</span>
                 <span class="text-mist text-xs">${timeAgo(c.created_at ? new Date(c.created_at) : new Date())}</span>
               </div>
-              ${isMine ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+              ${canDeleteComment ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
             </div>
             <p class="text-ice text-xs mt-0.5">${escHtml(c.content)}</p>
           </div>
@@ -727,9 +746,10 @@ window.submitComment = async function (postId) {
   try {
     // Insert comment row
     const { error } = await supabase.from("comments").insert({
-      postid:      postId,
+      postid:       postId,
       authorid:     currentUser.id,
       authorname:   currentUserDoc?.username || "Anonymous",
+      authoravatar: currentUserDoc?.avatar   || "",
       content,
       created_at:   new Date().toISOString(),
     });
@@ -746,7 +766,7 @@ window.submitComment = async function (postId) {
 
       // Notify post author if not self
       if (post.authorid !== currentUser.id) {
-        pushNotification(`${currentUserDoc?.username} commented on your post.`);
+        pushNotification(post.authorid, `${currentUserDoc?.username} commented on your post.`, postId);
       }
     }
 
@@ -802,22 +822,102 @@ function appendChatMessage(container, m) {
   const wrapper = document.createElement("div");
   wrapper.id = `chat-msg-${m.id}`;
   wrapper.className = `flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`;
+  const replyBlock = m.replytoid ? `
+    <div class="border-l-2 border-lime/50 pl-2 mb-1 opacity-70">
+      <p class="text-lime text-xs font-medium">${escHtml(m.replytoauthor || "")}</p>
+      <p class="text-xs truncate max-w-[200px]">${escHtml(m.replytotext || "")}</p>
+    </div>` : "";
+
   wrapper.innerHTML = `
     <img src="${avatarSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
     <div class="max-w-xs">
       ${!isMine ? `<button onclick="openDMFromPost('${m.authorid}','${escHtml(m.authorname)}')" class="text-xs text-mist mb-1 hover:text-lime transition text-left">${escHtml(m.authorname)}</button>` : ""}
       <div class="${isMine ? "bubble-me" : "bubble-other"}">
+        ${replyBlock}
         ${m.imageurl ? `<img src="${m.imageurl}" class="max-w-xs rounded-lg mb-2 cursor-pointer" onclick="window.open('${m.imageurl}','_blank')" />` : ''}
         <p>${escHtml(m.content)}</p>
       </div>
       <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
         <p class="text-xs text-mist">${ts}</p>
-        ${isMine ? `<button onclick="deleteChatMessage('${m.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+        <button onclick="startChatReply('${m.id}','${escHtml(m.authorname)}','${escHtml((m.content||'').slice(0,80)).replace(/'/g,"\\'")}')" class="text-mist text-xs hover:text-lime"><i data-lucide="reply" class="w-3 h-3"></i></button>
+        ${(isMine || currentUserDoc?.is_admin) ? `<button onclick="deleteChatMessage('${m.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
       </div>
     </div>`;
 
   container.appendChild(wrapper);
+  lucide.createIcons();
+
+  const bubbleEl = wrapper.querySelector(".bubble-me, .bubble-other");
+  enableSwipeToReply(wrapper, bubbleEl, () =>
+    startChatReply(m.id, m.authorname, (m.content || "").slice(0, 80))
+  );
 }
+
+// ── Swipe-to-reply (WhatsApp-style, touch only) ─────────────
+// Swipe a message bubble to the right past the threshold to trigger reply.
+// Falls back to the tap reply button for non-touch/desktop.
+function enableSwipeToReply(wrapperEl, bubbleEl, onReply) {
+  if (!wrapperEl || !bubbleEl) return;
+  let startX = 0, dx = 0, dragging = false;
+  const THRESHOLD = 60;
+  const MAX_DRAG  = 80;
+
+  wrapperEl.style.position = wrapperEl.style.position || "relative";
+  wrapperEl.style.touchAction = "pan-y";
+
+  // Reply icon that fades in as you swipe
+  const icon = document.createElement("div");
+  icon.className = "swipe-reply-icon";
+  icon.innerHTML = `<i data-lucide="reply" class="w-4 h-4"></i>`;
+  icon.style.cssText = "position:absolute;top:50%;left:-28px;transform:translateY(-50%);opacity:0;color:#b5ff47;pointer-events:none;transition:opacity 0.1s;";
+  wrapperEl.style.overflow = "visible";
+  wrapperEl.insertBefore(icon, wrapperEl.firstChild);
+
+  wrapperEl.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    dragging = true;
+    bubbleEl.style.transition = "none";
+  }, { passive: true });
+
+  wrapperEl.addEventListener("touchmove", (e) => {
+    if (!dragging) return;
+    const raw = e.touches[0].clientX - startX;
+    dx = Math.max(0, Math.min(raw, MAX_DRAG)); // only allow rightward swipe
+    bubbleEl.style.transform = `translateX(${dx}px)`;
+    icon.style.opacity = String(Math.min(dx / THRESHOLD, 1));
+  }, { passive: true });
+
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    bubbleEl.style.transition = "transform 0.2s ease";
+    bubbleEl.style.transform = "translateX(0)";
+    icon.style.opacity = "0";
+    if (dx >= THRESHOLD) {
+      if (navigator.vibrate) navigator.vibrate(10);
+      onReply();
+    }
+    dx = 0;
+  };
+  wrapperEl.addEventListener("touchend", endDrag);
+  wrapperEl.addEventListener("touchcancel", endDrag);
+}
+
+// ── Reply-to-message (chat) ─────────────────────────────────
+let pendingChatReply = null;
+
+window.startChatReply = function (msgId, authorName, preview) {
+  pendingChatReply = { id: msgId, author: authorName, text: preview };
+  document.getElementById("chat-reply-author").textContent = authorName;
+  document.getElementById("chat-reply-text").textContent = preview;
+  document.getElementById("chat-reply-preview").classList.remove("hidden");
+  document.getElementById("chat-input")?.focus();
+};
+
+window.cancelChatReply = function () {
+  pendingChatReply = null;
+  document.getElementById("chat-reply-preview").classList.add("hidden");
+};
 
 window._pendingChatImage = null;
 window.sendChatMessage = async function () {
@@ -841,14 +941,18 @@ window.sendChatMessage = async function () {
       if (preview) preview.classList.add("hidden");
     }
     const { error } = await supabase.from("chat_messages").insert({
-      authorid:     currentUser.id,
-      authorname:   currentUserDoc?.username || "Anonymous",
-      authoravatar: currentUserDoc?.avatar   || "",
-      content:      message,
-      imageurl:     imageUrl,
-      created_at:   new Date().toISOString(),
+      authorid:      currentUser.id,
+      authorname:    currentUserDoc?.username || "Anonymous",
+      authoravatar:  currentUserDoc?.avatar   || "",
+      content:       message,
+      imageurl:      imageUrl,
+      created_at:    new Date().toISOString(),
+      replytoid:     pendingChatReply?.id || null,
+      replytoauthor: pendingChatReply?.author || null,
+      replytotext:   pendingChatReply?.text || null,
     });
     if (error) throw error;
+    cancelChatReply();
   } catch (err) {
     input.value = message;
     showToast("Failed to send message", "error");
@@ -887,13 +991,13 @@ async function loadDMConversations() {
       const otherId = dm.user1id === currentUser.id ? dm.user2id : dm.user1id;
       // Fetch other user's profile
       const { data: otherProfile } = await supabase
-        .from("users").select("username, avatar").eq("uid", otherId).single();
+        .from("public_profiles").select("username, avatar").eq("uid", otherId).single();
       const otherName   = otherProfile?.username || "Unknown";
       const otherAvatar = otherProfile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=0f1f17&color=b5ff47&size=40`;
       const preview     = dm.lastmsg || "";
 
       container.innerHTML += `
-        <div class="dm-convo-item" onclick="openDMById('${dm.id}','${otherId}','${escHtml(otherName)}','${escHtml(otherAvatar)}')">
+        <div class="dm-convo-item" data-dm-id="${dm.id}" onclick="openDMById('${dm.id}','${otherId}','${escHtml(otherName)}','${escHtml(otherAvatar)}')">
           <img src="${otherAvatar}" class="w-8 h-8 rounded-full shrink-0 object-cover" />
           <div class="min-w-0">
             <p class="text-ice text-sm font-medium truncate">${escHtml(otherName)}</p>
@@ -914,7 +1018,7 @@ window.startDM = async function () {
 
   try {
     const { data, error } = await supabase
-      .from("users").select("*")
+      .from("public_profiles").select("*")
       .eq("username", query_)
       .limit(1);
 
@@ -940,6 +1044,7 @@ window.startDM = async function () {
 /** Open (or create) a DM thread */
 window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
   activeDMUser = { id: otherId, name: otherName, avatar: otherAvatar };
+  cancelDMReply();
 
   document.getElementById("dm-header").textContent = `💬 ${otherName}`;
   document.getElementById("dm-input-area").classList.remove("hidden");
@@ -989,29 +1094,60 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
         ? (currentUserDoc?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserDoc?.username||"Me")}&background=0f1f17&color=b5ff47&size=40`)
         : (otherAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherName)}&background=0f1f17&color=b5ff47&size=40`);
 
+      const dmReplyBlock = m.replytoid ? `
+        <div class="border-l-2 border-lime/50 pl-2 mb-1 opacity-70">
+          <p class="text-lime text-xs font-medium">${escHtml(m.replytoauthor || "")}</p>
+          <p class="text-xs truncate max-w-[200px]">${escHtml(m.replytotext || "")}</p>
+        </div>` : "";
+
+      const senderName = isMine ? (currentUserDoc?.username || "Me") : otherName;
+
       const el = document.createElement("div");
       el.id = `dm-msg-${m.id}`;
       el.className = `flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`;
       el.innerHTML = `
         <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
         <div>
-          <div class="${isMine ? "bubble-me" : "bubble-other"}">${escHtml(m.content)}</div>
+          <div class="${isMine ? "bubble-me" : "bubble-other"}">${dmReplyBlock}${escHtml(m.content)}</div>
           <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
             <p class="text-xs text-mist">${timeAgo(m.created_at ? new Date(m.created_at) : new Date())}</p>
-            ${isMine ? `<button onclick="deleteDMMessage('${m.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+            <button onclick="startDMReply('${m.id}','${escHtml(senderName).replace(/'/g,"\\'")}','${escHtml((m.content||'').slice(0,80)).replace(/'/g,"\\'")}')" class="text-mist text-xs hover:text-lime"><i data-lucide="reply" class="w-3 h-3"></i></button>
+            ${(isMine || currentUserDoc?.is_admin) ? `<button onclick="deleteDMMessage('${m.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
           </div>
         </div>`;
       dmContainer.appendChild(el);
       lucide.createIcons();
+
+      const dmBubbleEl = el.querySelector(".bubble-me, .bubble-other");
+      enableSwipeToReply(el, dmBubbleEl, () =>
+        startDMReply(m.id, senderName, (m.content || "").slice(0, 80))
+      );
     });
     dmContainer.scrollTop = dmContainer.scrollHeight;
   }
 
   fetchDMMessages();
-  dmUnsubscribe = subscribeChanges("dm_messages", fetchDMMessages, { filter: `dmId=eq.${dmId}` });
+  dmUnsubscribe = subscribeChanges("dm_messages", fetchDMMessages, { filter: `dmid=eq.${dmId}` });
 
   // Highlight active conversation
   document.querySelectorAll(".dm-convo-item").forEach(el => el.classList.remove("active"));
+  const activeConvoEl = document.querySelector(`.dm-convo-item[data-dm-id="${dmId}"]`);
+  if (activeConvoEl) activeConvoEl.classList.add("active");
+};
+
+let pendingDMReply = null;
+
+window.startDMReply = function (msgId, authorName, preview) {
+  pendingDMReply = { id: msgId, author: authorName, text: preview };
+  document.getElementById("dm-reply-author").textContent = authorName;
+  document.getElementById("dm-reply-text").textContent = preview;
+  document.getElementById("dm-reply-preview").classList.remove("hidden");
+  document.getElementById("dm-input")?.focus();
+};
+
+window.cancelDMReply = function () {
+  pendingDMReply = null;
+  document.getElementById("dm-reply-preview")?.classList.add("hidden");
 };
 
 window.sendDM = async function () {
@@ -1024,12 +1160,16 @@ window.sendDM = async function () {
 
   try {
     const { error } = await supabase.from("dm_messages").insert({
-      dmid:      dmId,
-      senderid:   currentUser.id,
-      content:    message,
-      created_at: new Date().toISOString(),
+      dmid:          dmId,
+      senderid:      currentUser.id,
+      content:       message,
+      created_at:    new Date().toISOString(),
+      replytoid:     pendingDMReply?.id || null,
+      replytoauthor: pendingDMReply?.author || null,
+      replytotext:   pendingDMReply?.text || null,
     });
     if (error) throw error;
+    cancelDMReply();
 
     // Update DM doc preview
     await supabase.from("dms").update({
@@ -1037,7 +1177,7 @@ window.sendDM = async function () {
     }).eq("id", dmId);
 
     // Push notification to receiver (stored globally; in prod use FCM)
-    pushNotification(`New DM from ${currentUserDoc?.username}`);
+    pushNotification(activeDMUser.id, `New DM from ${currentUserDoc?.username}`);
 
   } catch (err) {
     input.value = message;
@@ -1048,6 +1188,7 @@ window.sendDM = async function () {
 /** Open DM from a post's DM button */
 window.openDMFromPost = function (authorId, authorName) {
   if (!currentUser) { showToast("Log in to send DMs", "error"); return; }
+  if (authorId === currentUser.id) { showToast("You can't DM yourself", "error"); return; }
   navigate("dm");
   setTimeout(() => openDMById(null, authorId, authorName, ""), 200);
 };
@@ -1071,7 +1212,7 @@ async function initLeaderboard(type = "posts") {
     const orderField = type === "posts" ? "postcount" : "joinedat";
 
     const { data, error } = await supabase
-      .from("users").select("*")
+      .from("public_profiles").select("*")
       .order(orderField, { ascending: false })
       .limit(20);
 
@@ -1119,7 +1260,7 @@ async function initLeaderboard(type = "posts") {
 async function loadHomeStats() {
   try {
     const [usersRes, postsRes, msgsRes] = await Promise.all([
-      supabase.from("users").select("*", { count: "exact", head: true }),
+      supabase.from("public_profiles").select("*", { count: "exact", head: true }),
       supabase.from("posts").select("*", { count: "exact", head: true }),
       supabase.from("chat_messages").select("*", { count: "exact", head: true }),
     ]);
@@ -1132,18 +1273,53 @@ async function loadHomeStats() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  NOTIFICATIONS (in-memory; extend with Supabase table for persistence)
+//  NOTIFICATIONS (persisted in Supabase "notifications" table,
+//  so they actually reach the recipient's own session/device)
 // ═══════════════════════════════════════════════════════════
 
-function pushNotification(text) {
-  notifications.unshift({ text, time: new Date() });
-  playNotifSound(); // Play sound for every incoming notification
+let notifUnsubscribe = null;
 
-  const badge   = document.getElementById("notif-badge");
+/** Insert a notification row for the RECIPIENT (never for yourself). */
+async function pushNotification(recipientUid, text, postId = null) {
+  if (!recipientUid || !currentUser || recipientUid === currentUser.id) return;
+  try {
+    await supabase.from("notifications").insert({
+      userid:     recipientUid,
+      fromuser:   currentUserDoc?.username || "Someone",
+      fromavatar: currentUserDoc?.avatar || "",
+      text,
+      postid:     postId,
+      read:       false,
+      timestamp:  new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("NOTIFICATION INSERT FAILED:", err);
+  }
+}
+
+/** Fetch this user's own notifications and render them. */
+async function loadNotifications() {
+  if (!currentUser) return;
   const listEl  = document.getElementById("notif-list");
-  badge.classList.remove("hidden");
+  const badge   = document.getElementById("notif-badge");
+  if (!listEl) return;
 
-  renderNotifications(listEl);
+  try {
+    const { data, error } = await supabase
+      .from("notifications").select("*")
+      .eq("userid", currentUser.id)
+      .order("timestamp", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+
+    notifications = data || [];
+    const unreadCount = notifications.filter(n => !n.read).length;
+    if (badge) badge.classList.toggle("hidden", unreadCount === 0);
+
+    renderNotifications(listEl);
+  } catch (err) {
+    listEl.innerHTML = `<p class="p-4 text-center text-coral text-xs">Failed to load notifications.</p>`;
+  }
 }
 
 function renderNotifications(listEl) {
@@ -1151,24 +1327,71 @@ function renderNotifications(listEl) {
     listEl.innerHTML = `<p class="p-4 text-center text-mist text-sm">No notifications yet</p>`;
     return;
   }
-  listEl.innerHTML = notifications.slice(0, 10).map(n => `
-    <div class="notif-item">
+  listEl.innerHTML = notifications.slice(0, 20).map(n => `
+    <div class="notif-item ${!n.read ? "bg-lime/5" : ""}">
       <p class="text-ice text-sm">${escHtml(n.text)}</p>
-      <p class="text-mist text-xs mt-0.5">${timeAgo(n.time)}</p>
+      <p class="text-mist text-xs mt-0.5">${timeAgo(n.timestamp ? new Date(n.timestamp) : new Date())}</p>
     </div>`).join("");
 }
 
-window.toggleNotifications = function () {
+/** Start listening for this user's notifications (call after login). */
+function startNotifications() {
+  if (!currentUser) return;
+  loadNotifications();
+  playNotifSoundOnNewRow(); // subscribe below
+}
+
+// Subscribes with realtime + poll fallback, and plays a sound only for
+// notifications that are genuinely new since the listener started.
+function playNotifSoundOnNewRow() {
+  if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
+  let knownIds = new Set(notifications.map(n => n.id));
+  notifUnsubscribe = subscribeChanges("notifications", async () => {
+    const { data } = await supabase
+      .from("notifications").select("*")
+      .eq("userid", currentUser.id)
+      .order("timestamp", { ascending: false })
+      .limit(20);
+    if (data) {
+      const hasNew = data.some(n => !knownIds.has(n.id));
+      if (hasNew) playNotifSound();
+      knownIds = new Set(data.map(n => n.id));
+      notifications = data;
+      const listEl = document.getElementById("notif-list");
+      const badge  = document.getElementById("notif-badge");
+      if (listEl) renderNotifications(listEl);
+      if (badge) badge.classList.toggle("hidden", !data.some(n => !n.read));
+    }
+  }, { filter: `userid=eq.${currentUser.id}` });
+}
+
+function stopNotifications() {
+  if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
+  notifications = [];
+}
+
+window.toggleNotifications = async function () {
   const panel = document.getElementById("notif-panel");
   panel.classList.toggle("hidden");
-  // Clear badge
-  document.getElementById("notif-badge").classList.add("hidden");
+
+  if (!panel.classList.contains("hidden") && currentUser) {
+    // Mark all as read when the panel is opened
+    document.getElementById("notif-badge").classList.add("hidden");
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+    if (unreadIds.length) {
+      await supabase.from("notifications").update({ read: true }).in("id", unreadIds);
+      notifications = notifications.map(n => ({ ...n, read: true }));
+    }
+  }
 };
 
-window.clearNotifications = function () {
+window.clearNotifications = async function () {
+  if (currentUser) {
+    await supabase.from("notifications").delete().eq("userid", currentUser.id);
+  }
   notifications = [];
-  const listEl  = document.getElementById("notif-list");
-  renderNotifications(listEl);
+  const listEl = document.getElementById("notif-list");
+  if (listEl) renderNotifications(listEl);
   document.getElementById("notif-badge").classList.add("hidden");
 };
 
@@ -1298,6 +1521,44 @@ function updateThemeIcon(theme) {
   document.documentElement.classList.add(saved);
   updateThemeIcon(saved);
 })();
+
+// ═══════════════════════════════════════════════════════════
+//  PWA INSTALL PROMPT
+// ═══════════════════════════════════════════════════════════
+
+let deferredInstallPrompt = null;
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => { /* non-critical */ });
+  });
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById("install-btn");
+  if (btn) { btn.classList.remove("hidden"); btn.classList.add("flex"); }
+});
+
+window.installApp = async function () {
+  if (!deferredInstallPrompt) {
+    showToast("App is already installed or not installable here", "error");
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  if (outcome === "accepted") showToast("App installed 🎉");
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("install-btn");
+  if (btn) { btn.classList.add("hidden"); btn.classList.remove("flex"); }
+};
+
+window.addEventListener("appinstalled", () => {
+  const btn = document.getElementById("install-btn");
+  if (btn) { btn.classList.add("hidden"); btn.classList.remove("flex"); }
+  deferredInstallPrompt = null;
+});
 
 // ── Bootstrap ─────────────────────────────────────────────
 // Initialise Lucide icons on first load

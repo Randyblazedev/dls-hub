@@ -377,6 +377,28 @@ html.light .feature-card:hover { border-color: #bdbdbd; box-shadow: 0 4px 12px r
   .form-input { padding: 10px 14px; font-size: 16px; }
 }
 
+/* ── Chat container height (fixes mobile bottom-nav overlap) ── */
+.chat-container {
+  height: calc(100vh - 56px);
+}
+@supports (height: 100dvh) {
+  .chat-container { height: calc(100dvh - 56px); }
+}
+@media (max-width: 767px) {
+  /* Chat page manages its own height/scroll, so it shouldn't get the
+     generic 80px page padding on top of this — that just added dead
+     space instead of clearing the fixed bottom nav. */
+  #page-chat.page-view { padding-bottom: 0 !important; }
+  .chat-container {
+    height: calc(100vh - 56px - 64px - env(safe-area-inset-bottom, 0px));
+  }
+  @supports (height: 100dvh) {
+    .chat-container {
+      height: calc(100dvh - 56px - 64px - env(safe-area-inset-bottom, 0px));
+    }
+  }
+}
+
 /* ── Chat responsive fix ── */
 @media (max-width: 640px) {
   .dm-sidebar {
