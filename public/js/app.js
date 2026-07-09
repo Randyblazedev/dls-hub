@@ -158,18 +158,23 @@ onAuthChange(async (user) => {
       .from("users").select("*").eq("uid", user.id).single();
     if (!row) {
       const email = user.email || "";
-      const username = email.split("@")[0] || "User";
+      const pendingUsername = localStorage.getItem("dls-pending-username");
+      const pendingTeam = localStorage.getItem("dls-pending-team");
+      const username = pendingUsername || email.split("@")[0] || "User";
       const { error: insErr } = await supabase.from("users").insert({
-        uid: user.id,
+        uid:      user.id,
         username,
         email,
-        team: "No Team Set",
-        avatar: "",
-        bio: "",
+        team:     pendingTeam || "No Team Set",
+        avatar:   "",
+        bio:      "",
         postcount: 0,
         joinedat: new Date().toISOString(),
       });
       if (!insErr) {
+        // Clear pending signup data now that the row is created
+        localStorage.removeItem("dls-pending-username");
+        localStorage.removeItem("dls-pending-team");
         const { data: fresh } = await supabase
           .from("users").select("*").eq("uid", user.id).single();
         row = fresh;
@@ -276,7 +281,21 @@ window.handleSignUp = async function () {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
 
-    // Write user row to Supabase
+    // Check if Supabase requires email confirmation
+    // When confirmation is ON, data.user exists but session is null
+    const needsConfirmation = data.user && !data.session;
+
+    if (needsConfirmation) {
+      // Store username/team so they're available after the user confirms
+      // and logs in for the first time (onAuthChange will pick these up)
+      localStorage.setItem("dls-pending-username", username);
+      localStorage.setItem("dls-pending-team", team || "No Team Set");
+      errEl.classList.add("hidden");
+      showConfirmationScreen(email);
+      return;
+    }
+
+    // Confirmation is OFF — write user row and go straight to feed
     const { error: insertErr } = await supabase.from("users").insert({
       uid:       data.user.id,
       username,
@@ -298,8 +317,39 @@ window.handleSignUp = async function () {
 };
 
 // ═══════════════════════════════════════════════════════════
-//  LOGIN
+//  EMAIL CONFIRMATION SCREEN
 // ═══════════════════════════════════════════════════════════
+
+function showConfirmationScreen(email) {
+  // Hide all pages and show a dedicated confirmation message
+  document.querySelectorAll(".page-view").forEach(el => el.classList.add("hidden"));
+  const target = document.getElementById("page-signup");
+  if (target) target.classList.remove("hidden");
+
+  const errEl = document.getElementById("signup-error");
+  errEl.className = "text-lime text-sm bg-lime/10 border border-lime/30 rounded-xl p-4 text-center";
+  errEl.innerHTML = `
+    <i data-lucide="mail-check" class="w-8 h-8 mx-auto mb-2 text-lime"></i>
+    <p class="font-medium mb-1">Check your email!</p>
+    <p class="text-mist text-xs">We sent a confirmation link to <strong class="text-ice">${escHtml(email)}</strong>.</p>
+    <p class="text-mist text-xs mt-1">Click the link in that email, then come back here and log in.</p>
+    <button onclick="resendConfirmation('${escHtml(email)}')" class="mt-3 text-xs text-mist underline hover:text-lime">Didn't get it? Resend</button>
+  `;
+  errEl.classList.remove("hidden");
+  lucide.createIcons();
+}
+
+window.resendConfirmation = async function(email) {
+  try {
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    if (error) throw error;
+    showToast("Confirmation email resent ✅");
+  } catch (err) {
+    showToast("Couldn't resend. Try again later.", "error");
+  }
+};
+
+// ── LOGIN ──────────────────────────────────────────────────
 
 window.handleLogin = async function () {
   const email    = document.getElementById("li-email").value.trim();
