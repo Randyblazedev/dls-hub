@@ -801,13 +801,20 @@ function initChat() {
         return;
       }
 
-      // Clear the "no messages yet" placeholder (if any) once real data arrives
-      if (!renderedIds.size) container.innerHTML = "";
+      // Was the user already near the bottom before we add anything?
+      // (must check BEFORE appending, since appending changes scrollHeight)
+      const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+      const isFirstLoad = renderedIds.size === 0;
 
+      // Clear the "no messages yet" placeholder (if any) once real data arrives
+      if (isFirstLoad) container.innerHTML = "";
+
+      let addedNew = false;
       data.forEach(m => {
         if (!renderedIds.has(m.id)) {
           renderedIds.add(m.id);
           appendChatMessage(container, m);
+          addedNew = true;
           // Play sound for new messages from others
           if (currentUser && m.authorid !== currentUser.id && lastChatMsgId) {
             playNotifSound();
@@ -815,7 +822,14 @@ function initChat() {
         }
       });
       if (data.length) lastChatMsgId = data[data.length - 1].id;
-      container.scrollTop = container.scrollHeight;
+
+      // Only jump to the bottom when something new actually arrived, and
+      // only if the user hadn't scrolled up to read older messages — the
+      // 5s safety-net poll runs constantly, so without this check it would
+      // yank the user back to the bottom every few seconds regardless.
+      if (addedNew && (isFirstLoad || wasNearBottom)) {
+        container.scrollTop = container.scrollHeight;
+      }
     } catch (err) {
       console.error("CHAT FETCH ERROR:", err);
       container.innerHTML = `<p class="text-coral text-sm text-center py-12">Failed to load chat: ${escHtml(err.message || "unknown error")}</p>`;
@@ -1097,9 +1111,14 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
 
     if (error || !data) return;
 
+    const wasNearBottom = dmContainer.scrollHeight - dmContainer.scrollTop - dmContainer.clientHeight < 120;
+    const isFirstLoad = renderedDmIds.size === 0;
+    let addedNew = false;
+
     data.forEach(m => {
       if (renderedDmIds.has(m.id)) return;
       renderedDmIds.add(m.id);
+      addedNew = true;
 
       const isMine  = m.senderid === currentUser.id;
       const avSrc   = isMine
@@ -1135,7 +1154,9 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
         startDMReply(m.id, senderName, (m.content || "").slice(0, 80))
       );
     });
-    dmContainer.scrollTop = dmContainer.scrollHeight;
+    if (addedNew && (isFirstLoad || wasNearBottom)) {
+      dmContainer.scrollTop = dmContainer.scrollHeight;
+    }
   }
 
   fetchDMMessages();
