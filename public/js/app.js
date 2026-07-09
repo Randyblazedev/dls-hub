@@ -783,7 +783,8 @@ window.submitComment = async function (postId) {
 
 function initChat() {
   const container = document.getElementById("chat-messages");
-  container.innerHTML = "";
+  container.innerHTML = `<div class="text-center text-mist py-12"><i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i>Loading chat...</div>`;
+  lucide.createIcons();
   const renderedIds = new Set();
 
   async function fetchChat() {
@@ -1074,7 +1075,8 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
 
   document.getElementById("dm-header").textContent = `💬 ${otherName}`;
   document.getElementById("dm-input-area").classList.remove("hidden");
-  document.getElementById("dm-messages").innerHTML = "";
+  document.getElementById("dm-messages").innerHTML = `<div class="text-center text-mist py-12"><i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i>Loading messages...</div>`;
+  lucide.createIcons();
 
   // Unsubscribe from previous DM
   if (dmUnsubscribe) { dmUnsubscribe(); dmUnsubscribe = null; }
@@ -1109,10 +1111,21 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
       .order("created_at", { ascending: true })
       .limit(50);
 
-    if (error || !data) return;
+    if (error) {
+      if (!renderedDmIds.size) {
+        dmContainer.innerHTML = `<p class="text-coral text-sm text-center py-12">Failed to load messages.</p>`;
+      }
+      return;
+    }
+    if (!data) return;
+
+    const isFirstLoad = renderedDmIds.size === 0;
+    if (isFirstLoad) dmContainer.innerHTML = "";
+    if (isFirstLoad && !data.length) {
+      dmContainer.innerHTML = `<p class="text-mist text-sm text-center py-12">No messages yet. Say hi!</p>`;
+    }
 
     const wasNearBottom = dmContainer.scrollHeight - dmContainer.scrollTop - dmContainer.clientHeight < 120;
-    const isFirstLoad = renderedDmIds.size === 0;
     let addedNew = false;
 
     data.forEach(m => {
