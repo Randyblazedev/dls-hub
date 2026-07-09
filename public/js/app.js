@@ -1541,7 +1541,26 @@ window.addEventListener("beforeinstallprompt", (e) => {
   if (btn) { btn.classList.remove("hidden"); btn.classList.add("flex"); }
 });
 
+// iOS Safari never fires beforeinstallprompt, so show the button with
+// manual instructions instead of leaving it permanently hidden there.
+function isIOSSafari() {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+  return isIOS && !isStandalone;
+}
+if (isIOSSafari()) {
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("install-btn");
+    if (btn) { btn.classList.remove("hidden"); btn.classList.add("flex"); }
+  });
+}
+
 window.installApp = async function () {
+  if (isIOSSafari()) {
+    showToast("Tap the Share icon, then 'Add to Home Screen' 📲");
+    return;
+  }
   if (!deferredInstallPrompt) {
     showToast("App is already installed or not installable here", "error");
     return;
