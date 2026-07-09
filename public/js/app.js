@@ -793,7 +793,16 @@ function initChat() {
         .order("created_at", { ascending: true })
         .limit(100);
       if (error) throw error;
-      if (!data) return;
+
+      if (!data || !data.length) {
+        if (!renderedIds.size) {
+          container.innerHTML = `<p class="text-mist text-center py-12">No messages yet. Say something!</p>`;
+        }
+        return;
+      }
+
+      // Clear the "no messages yet" placeholder (if any) once real data arrives
+      if (!renderedIds.size) container.innerHTML = "";
 
       data.forEach(m => {
         if (!renderedIds.has(m.id)) {
@@ -807,7 +816,10 @@ function initChat() {
       });
       if (data.length) lastChatMsgId = data[data.length - 1].id;
       container.scrollTop = container.scrollHeight;
-    } catch (_) { /* chat is non-critical */ }
+    } catch (err) {
+      console.error("CHAT FETCH ERROR:", err);
+      container.innerHTML = `<p class="text-coral text-sm text-center py-12">Failed to load chat: ${escHtml(err.message || "unknown error")}</p>`;
+    }
   }
 
   fetchChat();
