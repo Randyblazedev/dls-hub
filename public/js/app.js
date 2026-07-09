@@ -846,7 +846,7 @@ function appendChatMessage(container, m) {
       ${!isMine ? `<button onclick="openDMFromPost('${m.authorid}','${escHtml(m.authorname)}')" class="text-xs text-mist mb-1 hover:text-lime transition text-left">${escHtml(m.authorname)}</button>` : ""}
       <div class="${isMine ? "bubble-me" : "bubble-other"}">
         ${replyBlock}
-        ${m.imageurl ? `<img src="${m.imageurl}" class="max-w-xs rounded-lg mb-2 cursor-pointer" onclick="window.open('${m.imageurl}','_blank')" />` : ''}
+        ${m.imageurl ? `<img src="${m.imageurl}" class="w-full rounded-lg mb-2 cursor-pointer" onclick="window.open('${m.imageurl}','_blank')" />` : ''}
         <p>${escHtml(m.content)}</p>
       </div>
       <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
