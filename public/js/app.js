@@ -246,6 +246,31 @@ window.handleSignUp = async function () {
     return;
   }
 
+  // Proper email format check — rejects abc@abc, @gmail.com, abc@, etc.
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!emailRegex.test(email)) {
+    showAuthError(errEl, "Please enter a valid email address (e.g. you@gmail.com).");
+    return;
+  }
+
+  // Block obvious disposable/fake email domains
+  const blockedDomains = ["mailinator.com","guerrillamail.com","tempmail.com","throwam.com","sharklasers.com","trashmail.com","yopmail.com"];
+  const emailDomain = email.split("@")[1]?.toLowerCase();
+  if (blockedDomains.includes(emailDomain)) {
+    showAuthError(errEl, "Please use a real email address.");
+    return;
+  }
+
+  // Check username isn't already taken
+  try {
+    const { data: existing } = await supabase
+      .from("users").select("uid").eq("username", username).limit(1);
+    if (existing && existing.length > 0) {
+      showAuthError(errEl, "That username is already taken. Choose another.");
+      return;
+    }
+  } catch (_) { /* non-critical — proceed */ }
+
   try {
     // Supabase Auth creates the user
     const { data, error } = await supabase.auth.signUp({ email, password });
@@ -1531,7 +1556,7 @@ function friendlyAuthError(msg) {
   if (lower.includes("too many") || lower.includes("rate limit"))
     return "Too many failed attempts. Try again later.";
   if (lower.includes("email not confirmed"))
-    return "Please confirm your email address first.";
+    return "Your email hasn't been confirmed yet. Check your inbox for a confirmation link, or contact the admin.";
 
   return "Something went wrong. Please try again.";
 }
