@@ -54,8 +54,8 @@ ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS imageurl text;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS reactions jsonb DEFAULT '{}';
 */
 
-const ADMIN_EMAILS = ['asonganyirandy143@gmail.com'];
-function isAdmin() { return window.currentUser && ADMIN_EMAILS.includes(window.currentUser.email); }
+const ADMIN_EMAILS = ['asonganyirandy143@gmail.com']; // fallback only; real gate is DB is_admin + RLS
+function isAdmin() { return !!(window.currentUserDoc && window.currentUserDoc.is_admin); }
 
 // Chat image functions (sendChatMessage is now in app.js with image support)
 window.previewChatImage = function(e) {
@@ -319,13 +319,27 @@ function initPresence() {
   });
 }
 
+// FIX: previously nothing ever untracked/removed the channel on sign-out,
+// so (a) signed-out users kept showing as "online" until the tab closed, and
+// (b) initPresence()'s guard blocked ever re-creating the channel for the
+// next person who logged into the same tab.
+window.cleanupPresence = function () {
+  if (featurePresenceChannel) {
+    featurePresenceChannel.untrack();
+    window.supabase.removeChannel(featurePresenceChannel);
+    featurePresenceChannel = null;
+  }
+  var el = document.getElementById('online-count');
+  if (el) el.classList.add('hidden');
+};
+
 // ═══ ADMIN ═══
 async function initAdmin() {
   var ac = document.getElementById('admin-content');
   if (!ac) return;
   if (!isAdmin()) { ac.innerHTML = '<p class="text-coral text-center py-12">Access denied. Admin only.</p>'; return; }
   try {
-    var r1 = await window.supabase.from('users').select('*', { count: 'exact', head: true });
+    var r1 = await window.supabase.from('public_profiles').select('*', { count: 'exact', head: true });
     var r2 = await window.supabase.from('posts').select('*', { count: 'exact', head: true });
     var r3 = await window.supabase.from('chat_messages').select('*', { count: 'exact', head: true });
     var r4 = await window.supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(20);
@@ -333,7 +347,6 @@ async function initAdmin() {
     if (stats) {
       var items = [{ l: 'Users', v: r1.count||0, i: 'users' }, { l: 'Posts', v: r2.count||0, i: 'file-text' }, { l: 'Messages', v: r3.count||0, i: 'message-square' }, { l: 'Reports', v: (r4.data||[]).length, i: 'flag' }];
       stats.innerHTML = items.map(function(s) { return '<div class="bg-turf border border-line rounded-xl p-4 text-center"><i data-lucide="' + s.i + '" class="w-6 h-6 mx-auto text-lime mb-2"></i><p class="text-ice font-display text-2xl">' + s.v + '</p><p class="text-mist text-xs">' + s.l + '</p></div>'; }).join('');
-      lucide.createIcons();
     }
     var rl = document.getElementById('admin-reports');
     if (rl) {
@@ -342,9 +355,100 @@ async function initAdmin() {
         return '<div class="flex items-center justify-between py-3 border-b border-line"><div><p class="text-ice text-sm">' + window.escHtml(r.reason) + ' on ' + window.escHtml(r.content_type) + '</p><p class="text-mist text-xs">' + window.escHtml(r.content_id) + ' · ' + window.timeAgo(new Date(r.created_at)) + '</p></div><button onclick="dismissReport(\'' + r.id + '\')" class="text-mist text-xs hover:text-coral">Dismiss</button></div>';
       }).join('') : '<p class="text-mist text-sm">No reports.</p>';
     }
-  } catch (_) {}
+
+    // All posts (admin can see and delete any post's full text)
+    var pl = document.getElementById('admin-posts');
+    if (pl) {
+      var pr = await window.supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
+      var posts = pr.data || [];
+      pl.innerHTML = posts.length ? posts.map(function(p) {
+        return '<div class="flex items-start justify-between gap-3 py-2 border-b border-line"><div class="min-w-0"><p class="text-lime text-xs font-medium">' + window.escHtml(p.authorname) + '</p><p class="text-ice text-sm break-words">' + window.escHtml(p.content || '') + '</p></div><button onclick="adminDeletePost(\'' + p.id + '\')" class="text-coral text-xs hover:text-white shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>';
+      }).join('') : '<p class="text-mist text-sm">No posts.</p>';
+    }
+
+    // Recent chat messages (admin can see and delete any message's full text)
+    var ml = document.getElementById('admin-messages');
+    if (ml) {
+      var mr = await window.supabase.from('chat_messages').select('*').order('created_at', { ascending: false }).limit(50);
+      var msgs = mr.data || [];
+      ml.innerHTML = msgs.length ? msgs.map(function(m) {
+        return '<div class="flex items-start justify-between gap-3 py-2 border-b border-line"><div class="min-w-0"><p class="text-lime text-xs font-medium">' + window.escHtml(m.authorname) + '</p><p class="text-ice text-sm break-words">' + window.escHtml(m.content || '') + '</p></div><button onclick="adminDeleteChatMessage(\'' + m.id + '\')" class="text-coral text-xs hover:text-white shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>';
+      }).join('') : '<p class="text-mist text-sm">No messages.</p>';
+    }
+
+    // Users: ban/unban and remove (wipes their content; see notes on hard account deletion)
+    var ul = document.getElementById('admin-users');
+    if (ul) {
+      var ur = await window.supabase.from('users').select('uid, username, email, banned, is_admin').order('joinedat', { ascending: false }).limit(100);
+      var users = ur.data || [];
+      ul.innerHTML = users.length ? users.map(function(u) {
+        var meTag = u.is_admin ? ' <span class="text-lime text-xs">(admin)</span>' : '';
+        var bannedTag = u.banned ? ' <span class="text-coral text-xs">(banned)</span>' : '';
+        var banBtn = u.is_admin ? '' : (u.banned
+          ? '<button onclick="adminUnbanUser(\'' + u.uid + '\')" class="text-lime text-xs hover:underline mr-3">Unban</button>'
+          : '<button onclick="adminBanUser(\'' + u.uid + '\')" class="text-mist text-xs hover:text-coral mr-3">Ban</button>');
+        var removeBtn = u.is_admin ? '' : '<button onclick="adminRemoveUser(\'' + u.uid + '\',\'' + window.escHtml(u.username) + '\')" class="text-coral text-xs hover:text-white">Remove</button>';
+        return '<div class="flex items-center justify-between py-2.5 border-b border-line"><div class="min-w-0"><p class="text-ice text-sm">' + window.escHtml(u.username) + meTag + bannedTag + '</p><p class="text-mist text-xs truncate">' + window.escHtml(u.email || '') + '</p></div><div class="shrink-0">' + banBtn + removeBtn + '</div></div>';
+      }).join('') : '<p class="text-mist text-sm">No users.</p>';
+    }
+
+    lucide.createIcons();
+  } catch (err) { console.error('ADMIN LOAD ERROR:', err); }
 }
 window.dismissReport = async function(id) { await window.supabase.from('reports').delete().eq('id', id); window.showToast('Dismissed'); initAdmin(); };
+
+window.adminDeletePost = async function(id) {
+  if (!isAdmin()) return;
+  if (!await window.showConfirm('Delete this post?')) return;
+  var { error } = await window.supabase.from('posts').delete().eq('id', id);
+  if (error) { window.showToast('Failed to delete', 'error'); return; }
+  window.showToast('Post deleted'); initAdmin();
+};
+
+window.adminDeleteChatMessage = async function(id) {
+  if (!isAdmin()) return;
+  if (!await window.showConfirm('Delete this message?')) return;
+  var { error } = await window.supabase.from('chat_messages').delete().eq('id', id);
+  if (error) { window.showToast('Failed to delete', 'error'); return; }
+  window.showToast('Message deleted'); initAdmin();
+};
+
+window.adminBanUser = async function(uid) {
+  if (!isAdmin()) return;
+  if (!await window.showConfirm('Ban this user? They will be signed out and unable to post, comment, or chat.')) return;
+  var { error } = await window.supabase.from('users').update({ banned: true }).eq('uid', uid);
+  if (error) { window.showToast('Failed to ban', 'error'); return; }
+  window.showToast('User banned'); initAdmin();
+};
+
+window.adminUnbanUser = async function(uid) {
+  if (!isAdmin()) return;
+  var { error } = await window.supabase.from('users').update({ banned: false }).eq('uid', uid);
+  if (error) { window.showToast('Failed to unban', 'error'); return; }
+  window.showToast('User unbanned'); initAdmin();
+};
+
+// Removes a user's content site-wide and bans them so they can't return
+// and immediately repost. NOTE: this cannot delete their actual login
+// account — Supabase only allows that via the service_role key (server-side
+// only, e.g. an Edge Function), never from the browser's anon/authenticated
+// key, by design. To fully delete the account, use the Supabase dashboard:
+// Authentication → Users → Delete.
+window.adminRemoveUser = async function(uid, username) {
+  if (!isAdmin()) return;
+  if (!await window.showConfirm('Remove ' + username + '? This deletes all their posts, comments, chat messages, and DMs, and bans the account. This does not delete their login — do that from the Supabase dashboard if needed.')) return;
+  try {
+    await window.supabase.from('posts').delete().eq('authorid', uid);
+    await window.supabase.from('comments').delete().eq('authorid', uid);
+    await window.supabase.from('chat_messages').delete().eq('authorid', uid);
+    await window.supabase.from('dm_messages').delete().eq('senderid', uid);
+    await window.supabase.from('users').update({ banned: true }).eq('uid', uid);
+    window.showToast('User removed and banned');
+    initAdmin();
+  } catch (err) {
+    window.showToast('Failed to fully remove user', 'error');
+  }
+};
 
 // ═══ BOOTSTRAP ═══
 // Wait for app.js module to load (defer < module timing)
