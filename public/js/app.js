@@ -528,6 +528,8 @@ function initFeed() {
   container.innerHTML = `<div class="text-center text-mist py-12"><i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i>Loading feed...</div>`;
   lucide.createIcons();
 
+  const renderedPostIds = new Set();
+
   async function fetchFeed() {
     try {
       const { data, error } = await supabase
@@ -537,17 +539,72 @@ function initFeed() {
       if (error) throw error;
 
       if (!data || !data.length) {
-        container.innerHTML = `<p class="text-mist text-center py-12">No posts yet. Be the first to post!</p>`;
+        if (!renderedPostIds.size) {
+          container.innerHTML = `<p class="text-mist text-center py-12">No posts yet. Be the first to post!</p>`;
+        }
         return;
       }
-      container.innerHTML = "";
-      data.forEach(p => {
-        container.innerHTML += buildPostCard(p.id, p);
+
+      // Clear loading placeholder on first load only
+      if (!renderedPostIds.size) container.innerHTML = "";
+
+      // Build a map of fetched posts for quick lookup
+      const fetchedMap = new Map(data.map(p => [p.id, p]));
+
+      // 1. PATCH existing posts in-place (likes, comment count)
+      //    Never rebuild the whole card — just update the numbers
+      renderedPostIds.forEach(postId => {
+        const fresh = fetchedMap.get(postId);
+        if (!fresh) return;
+
+        // Update like count and liked state
+        const likeBtn = document.querySelector(`#post-${postId} .like-btn`);
+        if (likeBtn) {
+          const liked = currentUser && (fresh.likes || []).includes(currentUser.id);
+          likeBtn.className = `like-btn flex items-center gap-1.5 hover:text-lime transition ${liked ? "text-lime" : ""}`;
+          likeBtn.innerHTML = `<i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i> ${(fresh.likes || []).length}`;
+        }
+
+        // Update comment count
+        const commentBtn = document.querySelector(`#post-${postId} .comment-count`);
+        if (commentBtn) {
+          commentBtn.textContent = fresh.commentcount || 0;
+        }
       });
+
+      // 2. PREPEND new posts (ones not yet in the DOM)
+      // Reverse so newest ends up on top after prepending
+      const newPosts = data.filter(p => !renderedPostIds.has(p.id));
+      newPosts.reverse().forEach(p => {
+        renderedPostIds.add(p.id);
+        const temp = document.createElement("div");
+        temp.innerHTML = buildPostCard(p.id, p);
+        const card = temp.firstElementChild;
+        // Animate new cards in
+        card.style.opacity = "0";
+        card.style.transform = "translateY(-8px)";
+        container.prepend(card);
+        requestAnimationFrame(() => {
+          card.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+          card.style.opacity = "1";
+          card.style.transform = "translateY(0)";
+        });
+      });
+
+      // 3. REMOVE posts that were deleted
+      renderedPostIds.forEach(postId => {
+        if (!fetchedMap.has(postId)) {
+          document.getElementById(`post-${postId}`)?.remove();
+          renderedPostIds.delete(postId);
+        }
+      });
+
       lucide.createIcons();
     } catch (err) {
       console.error("FEED ERROR:", err);
-      container.innerHTML = `<p class="text-coral text-sm">Failed to load feed. Check your connection. (${escHtml(err.message || "unknown")})</p>`;
+      if (!renderedPostIds.size) {
+        container.innerHTML = `<p class="text-coral text-sm text-center py-12">Failed to load feed. (${escHtml(err.message || "unknown")})</p>`;
+      }
     }
   }
 
@@ -603,7 +660,7 @@ window.submitPost = async function () {
       imageUrl = await uploadPostImage(pendingPostImage);
     }
 
-    const { error } = await supabase.from("posts").insert({
+    const { data: inserted, error } = await supabase.from("posts").insert({
       authorid:       currentUser.id,
       authorname:     currentUserDoc?.username || "Anonymous",
       authoravatar:   currentUserDoc?.avatar   || "",
@@ -612,7 +669,7 @@ window.submitPost = async function () {
       created_at:     new Date().toISOString(),
       likes:          [],
       commentcount:   0,
-    });
+    }).select().single();
     if (error) throw error;
 
     const newCount = (currentUserDoc?.postcount || 0) + 1;
@@ -660,7 +717,7 @@ function buildPostCard(postId, p, isProfile = false) {
           <i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i> ${likeCount}
         </button>
         <button onclick="toggleComments('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition">
-          <i data-lucide="message-square" class="w-3.5 h-3.5"></i> ${p.commentcount || 0}
+          <i data-lucide="message-square" class="w-3.5 h-3.5"></i> <span class="comment-count">${p.commentcount || 0}</span>
         </button>
         <button onclick="sharePost('${postId}')" class="flex items-center gap-1.5 hover:text-lime transition"><i data-lucide="share-2" class="w-3.5 h-3.5"></i></button>
         <button onclick="reportContent('post','${postId}')" class="flex items-center gap-1.5 hover:text-coral transition"><i data-lucide="flag" class="w-3.5 h-3.5"></i></button>
@@ -706,10 +763,15 @@ window.toggleLike = async function (postId) {
 
   const { error } = await supabase.from("posts").update({ likes: newLikes }).eq("id", postId);
   if (error) { console.error("LIKE FAILED:", error); return; }
-  // Re-render the like count
+
+  // Update UI immediately (don't wait for next poll)
   const btn = document.querySelector(`#post-${postId} .like-btn`);
-  if (btn) btn.innerHTML = `<i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i> ${newLikes.length}`;
-  lucide.createIcons();
+  if (btn) {
+    const liked = newLikes.includes(uid);
+    btn.className = `like-btn flex items-center gap-1.5 hover:text-lime transition ${liked ? "text-lime" : ""}`;
+    btn.innerHTML = `<i data-lucide="thumbs-up" class="w-3.5 h-3.5"></i> ${newLikes.length}`;
+    lucide.createIcons();
+  }
 };
 
 window.deletePost = async function (postId) {
