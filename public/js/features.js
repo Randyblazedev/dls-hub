@@ -305,17 +305,36 @@ async function initPOTW() {
 
 // ═══ ONLINE PRESENCE ═══
 var featurePresenceChannel = null;
+window.onlineUserIds = new Set(); // exposed globally for leaderboard/feed blue dots
+
 function initPresence() {
   if (!window.currentUser || featurePresenceChannel) return;
   featurePresenceChannel = window.supabase.channel('online-users', { config: { presence: { key: window.currentUser.id } } });
   featurePresenceChannel.on('presence', { event: 'sync' }, function() {
-    var count = Object.keys(featurePresenceChannel.presenceState()).length;
+    var state = featurePresenceChannel.presenceState();
+    // Update global online set
+    window.onlineUserIds = new Set(
+      Object.values(state).flatMap(function(arr) {
+        return arr.map(function(p) { return p.user_id; });
+      })
+    );
+    var count = window.onlineUserIds.size;
     var el = document.getElementById('online-count');
     var num = document.getElementById('online-num');
-    if (el && num) { var others = count - 1; num.textContent = others; el.classList.toggle('hidden', others < 1); }
+    var others = count - 1;
+    if (el && num) { num.textContent = others < 0 ? 0 : others; el.classList.toggle('hidden', others < 1); }
+    // Refresh blue dots on leaderboard if it's currently visible
+    if (document.getElementById('leaderboard-body')) updateLeaderboardDots();
   });
   featurePresenceChannel.subscribe(function(status) {
     if (status === 'SUBSCRIBED') featurePresenceChannel.track({ user_id: window.currentUser.id, username: window.currentUserDoc && window.currentUserDoc.username, online_at: new Date().toISOString() });
+  });
+}
+
+function updateLeaderboardDots() {
+  document.querySelectorAll('.lb-online-dot').forEach(function(dot) {
+    var uid = dot.dataset.uid;
+    dot.classList.toggle('hidden', !window.onlineUserIds.has(uid));
   });
 }
 

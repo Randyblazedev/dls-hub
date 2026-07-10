@@ -1482,11 +1482,14 @@ async function initLeaderboard(type = "posts") {
 
   try {
     const orderField = type === "posts" ? "postcount" : "joinedat";
+    // Newest = most recently joined (descending). Most Active = most posts (descending).
+    const ascending = false;
 
+    // Fetch ALL users — no limit
     const { data, error } = await supabase
       .from("public_profiles").select("*")
-      .order(orderField, { ascending: type !== "posts" ? true : false })
-      .limit(20);
+      .order(orderField, { ascending })
+      .limit(1000);
 
     if (error) throw error;
 
@@ -1496,31 +1499,42 @@ async function initLeaderboard(type = "posts") {
     }
 
     tbody.innerHTML = "";
-    let rank = 0;
-    data.forEach(u => {
-      rank++;
+    data.forEach((u, i) => {
+      const rank = i + 1;
       const avatarSrc = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username||"U")}&background=0f1f17&color=b5ff47&size=40`;
-      // Most Active: show post count. Newest Members: show join date.
       const scoreVal = type === "posts"
         ? `${u.postcount || 0} posts`
         : u.joinedat ? new Date(u.joinedat).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—";
 
       const rankClass = rank === 1 ? "lb-rank-1" : rank === 2 ? "lb-rank-2" : rank === 3 ? "lb-rank-3" : "text-mist";
       const medal     = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank;
+      const isMe      = currentUser && u.uid === currentUser.id;
 
       tbody.innerHTML += `
-        <tr class="lb-row">
+        <tr class="lb-row cursor-pointer hover:bg-white/5 transition" onclick="lbTapUser('${u.uid}','${escHtml(u.username)}','${escHtml(u.avatar||"")}')">
           <td class="py-4 px-6 ${rankClass} font-bold">${medal}</td>
           <td class="py-4 px-6">
             <div class="flex items-center gap-3">
-              <img src="${avatarSrc}" class="w-8 h-8 rounded-full object-cover" />
-              <span class="text-ice font-medium">${escHtml(u.username)}</span>
+              <div class="relative shrink-0">
+                <img src="${avatarSrc}" class="w-8 h-8 rounded-full object-cover" />
+                <span class="lb-online-dot hidden absolute bottom-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-pitch" data-uid="${u.uid}"></span>
+              </div>
+              <span class="text-ice font-medium">${escHtml(u.username)}${isMe ? ' <span class="text-lime text-xs">(you)</span>' : ""}</span>
             </div>
           </td>
           <td class="py-4 px-6 text-mist text-sm">${escHtml(u.team || "—")}</td>
           <td class="py-4 px-6 text-right text-lime font-medium">${scoreVal}</td>
         </tr>`;
     });
+
+    // Apply current online state to dots immediately
+    if (window.onlineUserIds) {
+      document.querySelectorAll('.lb-online-dot').forEach(dot => {
+        dot.classList.toggle('hidden', !window.onlineUserIds.has(dot.dataset.uid));
+      });
+    }
+
+    lucide.createIcons();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-coral text-sm">Failed to load leaderboard.</td></tr>`;
   }
@@ -1908,7 +1922,104 @@ window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
 });
 
-// ── Bootstrap ─────────────────────────────────────────────
+// ── Leaderboard tap: show DM + View Profile action sheet ──
+window.lbTapUser = function(uid, username, avatar) {
+  // Remove any existing sheet
+  document.getElementById("lb-action-sheet")?.remove();
+
+  const isMe = currentUser && uid === currentUser.id;
+  const sheet = document.createElement("div");
+  sheet.id = "lb-action-sheet";
+  sheet.className = "fixed inset-0 z-50 flex items-end justify-center";
+  sheet.innerHTML = `
+    <div class="absolute inset-0 bg-black/60" onclick="document.getElementById('lb-action-sheet').remove()"></div>
+    <div class="relative bg-turf border border-line rounded-t-2xl w-full max-w-lg p-5 pb-8 space-y-3 animate-slide-up">
+      <div class="flex items-center gap-3 mb-4">
+        <img src="${escHtml(avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=0f1f17&color=b5ff47&size=80`)}" class="w-12 h-12 rounded-full object-cover" />
+        <div>
+          <p class="text-ice font-medium">${escHtml(username)}</p>
+          ${window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : '<p class="text-xs text-mist">Offline</p>'}
+        </div>
+      </div>
+      ${!isMe ? `
+      <button onclick="document.getElementById('lb-action-sheet').remove(); openDMFromPost('${uid}','${escHtml(username)}')"
+        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition text-ice text-sm">
+        <i data-lucide="message-circle" class="w-5 h-5 text-lime"></i> Send DM
+      </button>` : ""}
+      <button onclick="document.getElementById('lb-action-sheet').remove(); viewPublicProfile('${uid}','${escHtml(username)}')"
+        class="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition text-ice text-sm">
+        <i data-lucide="user" class="w-5 h-5 text-lime"></i> View Profile
+      </button>
+      <button onclick="document.getElementById('lb-action-sheet').remove()"
+        class="w-full px-4 py-3 rounded-xl text-mist text-sm hover:text-ice transition">
+        Cancel
+      </button>
+    </div>`;
+  document.body.appendChild(sheet);
+  lucide.createIcons();
+};
+
+// ── Public profile view (posts by user, avatar, stats) ──
+window.viewPublicProfile = async function(uid, username) {
+  // Remove any existing sheet
+  document.getElementById("lb-action-sheet")?.remove();
+
+  // Show loading overlay
+  const overlay = document.createElement("div");
+  overlay.id = "profile-overlay";
+  overlay.className = "fixed inset-0 z-50 bg-pitch overflow-y-auto";
+  overlay.innerHTML = `
+    <div class="max-w-2xl mx-auto px-4 py-6">
+      <button onclick="document.getElementById('profile-overlay').remove()" class="flex items-center gap-2 text-mist hover:text-lime mb-6 transition">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i> Back
+      </button>
+      <div id="pub-profile-content" class="text-center py-12 text-mist">
+        <i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i> Loading...
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  lucide.createIcons();
+
+  try {
+    const [profileRes, postsRes] = await Promise.all([
+      supabase.from("public_profiles").select("*").eq("uid", uid).single(),
+      supabase.from("posts").select("*").eq("authorid", uid).order("created_at", { ascending: false }).limit(20),
+    ]);
+
+    const u = profileRes.data;
+    const posts = postsRes.data || [];
+    const avatarSrc = u?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=0f1f17&color=b5ff47&size=200`;
+    const isOnline = window.onlineUserIds?.has(uid);
+    const isMe = currentUser && uid === currentUser.id;
+
+    document.getElementById("pub-profile-content").innerHTML = `
+      <div class="flex flex-col items-center mb-6">
+        <div class="relative mb-3">
+          <img src="${escHtml(avatarSrc)}" class="w-20 h-20 rounded-full object-cover border-2 border-line" />
+          ${isOnline ? '<span class="absolute bottom-1 right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-pitch"></span>' : ""}
+        </div>
+        <h2 class="text-ice text-xl font-display">${escHtml(u?.username || username)}</h2>
+        ${u?.team ? `<p class="text-mist text-sm mt-1">⚽ ${escHtml(u.team)}</p>` : ""}
+        <p class="text-mist text-xs mt-1">${isOnline ? '<span class="text-blue-400">● Online now</span>' : "Offline"}</p>
+        <div class="flex gap-6 mt-4 text-center">
+          <div><p class="text-lime font-display text-xl">${u?.postcount || 0}</p><p class="text-mist text-xs">Posts</p></div>
+          <div><p class="text-lime font-display text-xl">${u?.joinedat ? new Date(u.joinedat).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—"}</p><p class="text-mist text-xs">Joined</p></div>
+        </div>
+        ${!isMe ? `
+        <button onclick="document.getElementById('profile-overlay').remove(); openDMFromPost('${uid}','${escHtml(username)}')"
+          class="mt-4 btn-lime px-6 py-2 text-sm flex items-center gap-2">
+          <i data-lucide="message-circle" class="w-4 h-4"></i> Send DM
+        </button>` : ""}
+      </div>
+      <h3 class="text-lime font-display text-lg mb-4 text-left">Posts</h3>
+      <div class="space-y-4">
+        ${posts.length ? posts.map(p => window.buildPostCard(p.id, p)).join("") : '<p class="text-mist text-sm text-center py-8">No posts yet.</p>'}
+      </div>`;
+    lucide.createIcons();
+  } catch (err) {
+    document.getElementById("pub-profile-content").innerHTML = `<p class="text-coral text-sm">Failed to load profile.</p>`;
+  }
+};
 // Initialise Lucide icons on first load
 document.addEventListener("DOMContentLoaded", () => {
   lucide.createIcons();
