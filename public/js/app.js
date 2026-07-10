@@ -709,7 +709,7 @@ function buildPostCard(postId, p, isProfile = false) {
         </div>
         ${canDelete ? `<button onclick="deletePost('${postId}')" class="text-coral hover:text-white text-xs flex items-center gap-1 ml-2 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Delete</button>` : ""}
       </div>
-      <p class="text-ice text-sm leading-relaxed mb-4 whitespace-pre-wrap">${escHtml(p.content)}</p>
+      <p class="text-ice text-sm leading-relaxed mb-4 whitespace-pre-wrap">${escHtml(p.content).replace(/@(\w+)/g, '<span class="text-blue-400 font-semibold">@$1</span>')}</p>
       ${p.imageurl ? `<img src="${p.imageurl}" alt="Post image" class="w-full max-h-80 object-cover rounded-lg mb-3" />` : ""}
       <div class="flex items-center gap-4 sm:gap-6 text-xs text-mist border-t border-line pt-3 flex-wrap">
         <button onclick="toggleLike('${postId}')"
@@ -846,22 +846,35 @@ window.toggleComments = async function (postId) {
 
   if (!section.classList.contains("hidden")) {
     await loadComments(postId);
-    // Subscribe so new comments from others appear in real-time
-    subscribeChanges("comments", () => loadComments(postId), { filter: `postid=eq.${postId}` });
+    // Subscribe once per post — don't stack subscriptions
+    if (!commentUnsubscribers[postId]) {
+      commentUnsubscribers[postId] = subscribeChanges(
+        "comments",
+        () => loadComments(postId),
+        { filter: `postid=eq.${postId}` }
+      );
+    }
     setTimeout(() => {
       section.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 100);
   } else {
-    // Clear cache when section closes so it re-fetches fresh on next open
+    // Unsubscribe and clear cache when closing so it re-fetches fresh next open
+    if (commentUnsubscribers[postId]) {
+      commentUnsubscribers[postId]();
+      delete commentUnsubscribers[postId];
+    }
     delete commentRenderedIds[postId];
   }
 };
 
-// Track rendered comment IDs per post so we never re-render existing ones
 const commentRenderedIds = {};
+const commentUnsubscribers = {}; // store per-post realtime unsubscribe fns
 
 async function loadComments(postId) {
   const listEl = document.getElementById(`comment-list-${postId}`);
+  if (!listEl) return;
+
+  // Only show loading on very first open, not on subsequent refreshes
   if (!commentRenderedIds[postId]) {
     commentRenderedIds[postId] = new Set();
     listEl.innerHTML = `<p class="text-mist text-xs">Loading...</p>`;
@@ -876,7 +889,7 @@ async function loadComments(postId) {
 
     if (error) throw error;
 
-    // Clear loading placeholder on first real load
+    // Clear loading placeholder only on first real load
     if (commentRenderedIds[postId].size === 0) {
       listEl.innerHTML = "";
       if (!data || !data.length) {
@@ -885,8 +898,8 @@ async function loadComments(postId) {
       }
     }
 
-    // Remove the "no comments yet" placeholder if we now have comments
-    const placeholder = listEl.querySelector("p");
+    // Remove "no comments yet" placeholder if we now have comments
+    const placeholder = listEl.querySelector("p.text-mist");
     if (placeholder && data?.length) placeholder.remove();
 
     // Only append genuinely new comments
@@ -897,6 +910,10 @@ async function loadComments(postId) {
       const avSrc = c.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.authorname||"U")}&background=0f1f17&color=b5ff47&size=40`;
       const isMine = currentUser && c.authorid === currentUser.id;
       const canDeleteComment = isMine || currentUserDoc?.is_admin;
+
+      // Format @mentions in blue bold
+      const formattedContent = escHtml(c.content).replace(/@(\w+)/g, '<span class="text-blue-400 font-semibold">@$1</span>');
+
       const el = document.createElement("div");
       el.className = "comment-item";
       el.id = `comment-${c.id}`;
@@ -910,19 +927,18 @@ async function loadComments(postId) {
             </div>
             ${canDeleteComment ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
           </div>
-          <p class="text-ice text-xs mt-0.5">${escHtml(c.content)}</p>
+          <p class="text-ice text-xs mt-0.5">${formattedContent}</p>
         </div>`;
       listEl.appendChild(el);
       lucide.createIcons();
 
-      // Swipe-to-reply on comments (same gesture as chat/DMs)
+      // Swipe-to-reply
       const bubbleEl = el.querySelector(".flex-1");
       enableSwipeToReply(el, bubbleEl, () => {
-        // Find the post's comment input and pre-fill reply context
         const postSection = listEl.closest('[id^="comments-"]');
-        const postId = postSection?.id?.replace("comments-", "");
-        if (!postId) return;
-        const input = document.getElementById(`comment-input-${postId}`);
+        const pid = postSection?.id?.replace("comments-", "");
+        if (!pid) return;
+        const input = document.getElementById(`comment-input-${pid}`);
         if (input) {
           input.dataset.replyTo = c.authorname;
           input.placeholder = `Replying to ${c.authorname}...`;
@@ -979,8 +995,7 @@ window.submitComment = async function (postId) {
     // Clear reply state
     delete input.dataset.replyTo;
     input.placeholder = "Add a comment...";
-    // Clear cache so loadComments re-fetches and shows the new comment instantly
-    delete commentRenderedIds[postId];
+    // loadComments is surgical — just call it, it will append the new comment
     await loadComments(postId);
   } catch (err) {
     showToast("Failed to comment. Try again.", "error");
@@ -1072,7 +1087,7 @@ function appendChatMessage(container, m) {
       <div class="${isMine ? "bubble-me" : "bubble-other"}">
         ${replyBlock}
         ${m.imageurl ? `<img src="${m.imageurl}" class="w-full rounded-lg mb-2 cursor-pointer" onclick="window.open('${m.imageurl}','_blank')" />` : ''}
-        <p>${escHtml(m.content)}</p>
+        <p>${escHtml(m.content).replace(/@(\w+)/g, '<span class="text-blue-400 font-semibold">@$1</span>')}</p>
       </div>
       <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
         <p class="text-xs text-mist">${ts}</p>
@@ -1372,7 +1387,7 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
       el.innerHTML = `
         <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
         <div>
-          <div class="${isMine ? "bubble-me" : "bubble-other"}">${dmReplyBlock}${escHtml(m.content)}</div>
+          <div class="${isMine ? "bubble-me" : "bubble-other"}">${dmReplyBlock}${escHtml(m.content).replace(/@(\w+)/g, '<span class="text-blue-400 font-semibold">@$1</span>')}</div>
           <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
             <p class="text-xs text-mist">${timeAgo(m.created_at ? new Date(m.created_at) : new Date())}</p>
             <button onclick="startDMReply('${m.id}','${escHtml(senderName).replace(/'/g,"\\'")}','${escHtml((m.content||'').slice(0,80)).replace(/'/g,"\\'")}')" class="text-mist text-xs hover:text-lime"><i data-lucide="reply" class="w-3 h-3"></i></button>
