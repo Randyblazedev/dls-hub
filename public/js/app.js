@@ -794,9 +794,16 @@ window.deleteComment = async function (commentId) {
   if (!await window.showConfirm("Delete this comment?")) return;
 
   try {
+    // Find which post this comment belongs to before deleting
+    const el = document.getElementById(`comment-${commentId}`);
+    const postSection = el?.closest('[id^="comments-"]');
+    const postId = postSection?.id?.replace("comments-", "");
+
     const { error } = await supabase.from("comments").delete().eq("id", commentId);
     if (error) throw error;
-    document.getElementById(`comment-${commentId}`)?.remove();
+    el?.remove();
+    // Clear cache so count re-fetches correctly
+    if (postId) delete commentRenderedIds[postId];
     showToast("Comment deleted");
   } catch (err) {
     showToast("Failed to delete comment", "error");
@@ -839,54 +846,79 @@ window.toggleComments = async function (postId) {
 
   if (!section.classList.contains("hidden")) {
     await loadComments(postId);
-    // Smooth scroll the comment section into view after it opens
-    // so the keyboard opening doesn't yank the page to the wrong position
+    // Subscribe so new comments from others appear in real-time
+    subscribeChanges("comments", () => loadComments(postId), { filter: `postid=eq.${postId}` });
     setTimeout(() => {
       section.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 100);
+  } else {
+    // Clear cache when section closes so it re-fetches fresh on next open
+    delete commentRenderedIds[postId];
   }
 };
 
+// Track rendered comment IDs per post so we never re-render existing ones
+const commentRenderedIds = {};
+
 async function loadComments(postId) {
   const listEl = document.getElementById(`comment-list-${postId}`);
-  listEl.innerHTML = `<p class="text-mist text-xs">Loading...</p>`;
+  if (!commentRenderedIds[postId]) {
+    commentRenderedIds[postId] = new Set();
+    listEl.innerHTML = `<p class="text-mist text-xs">Loading...</p>`;
+  }
 
   try {
     const { data, error } = await supabase
       .from("comments").select("*")
       .eq("postid", postId)
       .order("created_at", { ascending: true })
-      .limit(20);
+      .limit(50);
 
     if (error) throw error;
-    listEl.innerHTML = "";
 
-    if (!data || !data.length) {
-      listEl.innerHTML = `<p class="text-mist text-xs">No comments yet. Be first!</p>`;
-      return;
+    // Clear loading placeholder on first real load
+    if (commentRenderedIds[postId].size === 0) {
+      listEl.innerHTML = "";
+      if (!data || !data.length) {
+        listEl.innerHTML = `<p class="text-mist text-xs">No comments yet. Be first!</p>`;
+        return;
+      }
     }
 
-    data.forEach(c => {
+    // Remove the "no comments yet" placeholder if we now have comments
+    const placeholder = listEl.querySelector("p");
+    if (placeholder && data?.length) placeholder.remove();
+
+    // Only append genuinely new comments
+    (data || []).forEach(c => {
+      if (commentRenderedIds[postId].has(c.id)) return;
+      commentRenderedIds[postId].add(c.id);
+
       const avSrc = c.authoravatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.authorname||"U")}&background=0f1f17&color=b5ff47&size=40`;
       const isMine = currentUser && c.authorid === currentUser.id;
       const canDeleteComment = isMine || currentUserDoc?.is_admin;
-      listEl.innerHTML += `
-        <div class="comment-item" id="comment-${c.id}">
-          <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <div>
-                <span class="text-lime text-xs font-medium mr-2">${escHtml(c.authorname)}</span>
-                <span class="text-mist text-xs">${timeAgo(c.created_at ? new Date(c.created_at) : new Date())}</span>
-              </div>
-              ${canDeleteComment ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+      const el = document.createElement("div");
+      el.className = "comment-item";
+      el.id = `comment-${c.id}`;
+      el.innerHTML = `
+        <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+        <div class="flex-1">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-lime text-xs font-medium mr-2">${escHtml(c.authorname)}</span>
+              <span class="text-mist text-xs">${timeAgo(c.created_at ? new Date(c.created_at) : new Date())}</span>
             </div>
-            <p class="text-ice text-xs mt-0.5">${escHtml(c.content)}</p>
+            ${canDeleteComment ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
           </div>
+          <p class="text-ice text-xs mt-0.5">${escHtml(c.content)}</p>
         </div>`;
+      listEl.appendChild(el);
+      lucide.createIcons();
     });
   } catch (err) {
-    listEl.innerHTML = `<p class="text-coral text-xs">Failed to load comments.</p>`;
+    if (!commentRenderedIds[postId]?.size) {
+      listEl.innerHTML = `<p class="text-coral text-xs">Failed to load comments.</p>`;
+    }
   }
 }
 
@@ -925,6 +957,8 @@ window.submitComment = async function (postId) {
     }
 
     input.value = "";
+    // Clear cache so loadComments re-fetches and shows the new comment instantly
+    delete commentRenderedIds[postId];
     await loadComments(postId);
   } catch (err) {
     showToast("Failed to comment. Try again.", "error");
@@ -1419,7 +1453,9 @@ window.switchLeaderboard = async function (type) {
 
 async function initLeaderboard(type = "posts") {
   const tbody = document.getElementById("leaderboard-body");
+  const scoreHeader = document.getElementById("lb-score-header");
   tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-mist"><i data-lucide="loader" class="w-5 h-5 mx-auto animate-spin mb-2"></i>Loading...</td></tr>`;
+  if (scoreHeader) scoreHeader.textContent = type === "posts" ? "Posts" : "Joined";
   lucide.createIcons();
 
   try {
@@ -1427,7 +1463,7 @@ async function initLeaderboard(type = "posts") {
 
     const { data, error } = await supabase
       .from("public_profiles").select("*")
-      .order(orderField, { ascending: false })
+      .order(orderField, { ascending: type !== "posts" ? true : false })
       .limit(20);
 
     if (error) throw error;
@@ -1442,9 +1478,10 @@ async function initLeaderboard(type = "posts") {
     data.forEach(u => {
       rank++;
       const avatarSrc = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username||"U")}&background=0f1f17&color=b5ff47&size=40`;
-      const score     = type === "posts"
+      // Most Active: show post count. Newest Members: show join date.
+      const scoreVal = type === "posts"
         ? `${u.postcount || 0} posts`
-        : new Date(u.joinedat).toLocaleDateString();
+        : u.joinedat ? new Date(u.joinedat).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—";
 
       const rankClass = rank === 1 ? "lb-rank-1" : rank === 2 ? "lb-rank-2" : rank === 3 ? "lb-rank-3" : "text-mist";
       const medal     = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank;
@@ -1459,7 +1496,7 @@ async function initLeaderboard(type = "posts") {
             </div>
           </td>
           <td class="py-4 px-6 text-mist text-sm">${escHtml(u.team || "—")}</td>
-          <td class="py-4 px-6 text-right text-lime font-medium">${score}</td>
+          <td class="py-4 px-6 text-right text-lime font-medium">${scoreVal}</td>
         </tr>`;
     });
   } catch (err) {
