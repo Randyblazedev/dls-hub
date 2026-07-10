@@ -914,6 +914,22 @@ async function loadComments(postId) {
         </div>`;
       listEl.appendChild(el);
       lucide.createIcons();
+
+      // Swipe-to-reply on comments (same gesture as chat/DMs)
+      const bubbleEl = el.querySelector(".flex-1");
+      enableSwipeToReply(el, bubbleEl, () => {
+        // Find the post's comment input and pre-fill reply context
+        const postSection = listEl.closest('[id^="comments-"]');
+        const postId = postSection?.id?.replace("comments-", "");
+        if (!postId) return;
+        const input = document.getElementById(`comment-input-${postId}`);
+        if (input) {
+          input.dataset.replyTo = c.authorname;
+          input.placeholder = `Replying to ${c.authorname}...`;
+          input.focus();
+          setTimeout(() => input.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
+        }
+      });
     });
   } catch (err) {
     if (!commentRenderedIds[postId]?.size) {
@@ -925,11 +941,14 @@ async function loadComments(postId) {
 window.submitComment = async function (postId) {
   const input   = document.getElementById(`comment-input-${postId}`);
   const btn     = document.querySelector(`#comments-${postId} .btn-lime`);
-  const content = input.value.trim();
-  if (!content || !currentUser) return;
-  if (btn?.disabled) return; // prevent double-tap
+  const replyTo = input.dataset.replyTo || null;
+  const rawContent = input.value.trim();
+  if (!rawContent || !currentUser) return;
+  if (btn?.disabled) return;
 
-  // Disable while submitting
+  // Prefix with @username if replying
+  const content = replyTo ? `@${replyTo} ${rawContent}` : rawContent;
+
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
   input.disabled = true;
 
@@ -957,6 +976,9 @@ window.submitComment = async function (postId) {
     }
 
     input.value = "";
+    // Clear reply state
+    delete input.dataset.replyTo;
+    input.placeholder = "Add a comment...";
     // Clear cache so loadComments re-fetches and shows the new comment instantly
     delete commentRenderedIds[postId];
     await loadComments(postId);
