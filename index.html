@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>DLS Hub — Dream League Soccer Community</title>
   <meta name="description" content="The ultimate Dream League Soccer community hub. Connect, compete, and climb the leaderboards." />
   <!-- Open Graph / Social Share -->
@@ -424,7 +424,7 @@
             <i data-lucide="image" class="w-4 h-4"></i>
             <input id="chat-image-input" type="file" accept="image/*" class="hidden" onchange="previewChatImage(event)" />
           </label>
-          <input id="chat-input" type="text" class="form-input flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMessage()" />
+          <input id="chat-input" type="text" class="form-input flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMessage()" onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'nearest'}),300)" />
           <button onclick="sendChatMessage()" class="btn-lime px-5 py-2">
             <i data-lucide="send" class="w-4 h-4"></i>
           </button>
@@ -465,7 +465,7 @@
                 <button onclick="cancelDMReply()" class="text-mist hover:text-coral text-xs shrink-0">✕</button>
               </div>
               <div class="flex gap-3">
-                <input id="dm-input" type="text" class="form-input flex-1 text-base" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendDM()" />
+                <input id="dm-input" type="text" class="form-input flex-1 text-base" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendDM()" onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'nearest'}),300)" />
                 <button onclick="sendDM()" class="btn-lime px-4 py-2">
                   <i data-lucide="send" class="w-4 h-4"></i>
                 </button>

@@ -673,7 +673,9 @@ function buildPostCard(postId, p, isProfile = false) {
         <div id="comment-list-${postId}" class="space-y-3 mb-3"></div>
         <div class="flex gap-2">
           <input id="comment-input-${postId}" type="text" class="form-input flex-1 py-2 text-sm"
-            placeholder="Add a comment..." onkeydown="if(event.key==='Enter')submitComment('${postId}')" />
+            placeholder="Add a comment..." 
+            onkeydown="if(event.key==='Enter')submitComment('${postId}')"
+            onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'nearest'}),300)" />
           <button onclick="submitComment('${postId}')" class="btn-lime px-3 py-2 text-xs">Send</button>
         </div>
       </div>
@@ -775,6 +777,11 @@ window.toggleComments = async function (postId) {
 
   if (!section.classList.contains("hidden")) {
     await loadComments(postId);
+    // Smooth scroll the comment section into view after it opens
+    // so the keyboard opening doesn't yank the page to the wrong position
+    setTimeout(() => {
+      section.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 100);
   }
 };
 
