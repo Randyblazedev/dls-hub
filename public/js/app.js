@@ -1577,15 +1577,18 @@ let notifUnsubscribe = null;
 async function pushNotification(recipientUid, text, postId = null) {
   if (!recipientUid || !currentUser || recipientUid === currentUser.id) return;
   try {
-    await supabase.from("notifications").insert({
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("notifications").insert({
       userid:     recipientUid,
       fromuser:   currentUserDoc?.username || "Someone",
       fromavatar: currentUserDoc?.avatar || "",
       text,
       postid:     postId,
       read:       false,
-      timestamp:  new Date().toISOString(),
+      timestamp:  now,
+      created_at: now, // write both so ordering works either way
     });
+    if (error) console.error("NOTIFICATION INSERT FAILED:", error.message, error.details);
   } catch (err) {
     console.error("NOTIFICATION INSERT FAILED:", err);
   }
@@ -1632,11 +1635,18 @@ function renderNotifications(listEl) {
     listEl.innerHTML = `<p class="p-4 text-center text-mist text-sm">No notifications yet</p>`;
     return;
   }
-  listEl.innerHTML = notifications.slice(0, 20).map(n => `
-    <div class="notif-item ${!n.read ? "bg-lime/5" : ""}">
-      <p class="text-ice text-sm">${escHtml(n.text)}</p>
-      <p class="text-mist text-xs mt-0.5">${timeAgo(n.timestamp ? new Date(n.timestamp) : new Date())}</p>
-    </div>`).join("");
+  listEl.innerHTML = notifications.slice(0, 20).map(n => {
+    const avatar = n.fromavatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(n.fromuser||"?")}&background=0f1f17&color=b5ff47&size=40`;
+    const time = n.created_at || n.timestamp;
+    return `
+    <div class="notif-item flex items-start gap-3 ${!n.read ? "bg-lime/5" : ""}">
+      <img src="${escHtml(avatar)}" class="w-8 h-8 rounded-full shrink-0 object-cover mt-0.5" />
+      <div class="min-w-0">
+        <p class="text-ice text-sm leading-snug">${escHtml(n.text || "")}</p>
+        <p class="text-mist text-xs mt-0.5">${timeAgo(time ? new Date(time) : new Date())}</p>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 /** Start listening for this user's notifications (call after login). */
