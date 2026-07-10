@@ -1418,13 +1418,17 @@ async function loadHomeStats() {
   if (currentUser) {
     if (guestBtns)   guestBtns.classList.add("hidden");
     if (authBtns)    { authBtns.classList.remove("hidden"); authBtns.classList.add("flex"); }
-    if (statsSection) statsSection.classList.remove("hidden");
+    // Stats only visible to admin
+    if (statsSection) statsSection.classList.toggle("hidden", !currentUserDoc?.is_admin);
   } else {
     if (guestBtns)   guestBtns.classList.remove("hidden");
     if (authBtns)    authBtns.classList.add("hidden");
     if (statsSection) statsSection.classList.add("hidden");
     return; // don't bother fetching counts for guests
   }
+
+  // Only admins see the numbers
+  if (!currentUserDoc?.is_admin) return;
 
   try {
     const [usersRes, postsRes, msgsRes] = await Promise.all([
