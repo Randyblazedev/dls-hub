@@ -1039,13 +1039,20 @@ window.cancelChatReply = function () {
 };
 
 window._pendingChatImage = null;
+let _chatSending = false; // lock to prevent double-tap duplicate messages
+
 window.sendChatMessage = async function () {
+  if (_chatSending) return; // block double-tap
   const input   = document.getElementById("chat-input");
+  const sendBtn = document.getElementById("chat-send-btn");
   const message = input.value.trim();
   if (!message && !window._pendingChatImage) return;
   if (!currentUser) return;
 
+  _chatSending = true;
+  if (sendBtn) { sendBtn.disabled = true; }
   input.value = "";
+
   try {
     let imageUrl = null;
     if (window._pendingChatImage) {
@@ -1073,8 +1080,11 @@ window.sendChatMessage = async function () {
     if (error) throw error;
     cancelChatReply();
   } catch (err) {
-    input.value = message;
+    input.value = message; // restore on failure
     showToast("Failed to send message", "error");
+  } finally {
+    _chatSending = false;
+    if (sendBtn) { sendBtn.disabled = false; }
   }
 };
 
@@ -1288,11 +1298,17 @@ window.cancelDMReply = function () {
   document.getElementById("dm-reply-preview")?.classList.add("hidden");
 };
 
+let _dmSending = false;
+
 window.sendDM = async function () {
+  if (_dmSending) return;
   const input   = document.getElementById("dm-input");
+  const sendBtn = document.querySelector("#dm-input-area .btn-lime");
   const message = input.value.trim();
   if (!message || !activeDMUser || !currentUser) return;
 
+  _dmSending = true;
+  if (sendBtn) sendBtn.disabled = true;
   input.value = "";
   const dmId = [currentUser.id, activeDMUser.id].sort().join("_");
 
@@ -1309,17 +1325,15 @@ window.sendDM = async function () {
     if (error) throw error;
     cancelDMReply();
 
-    // Update DM doc preview
-    await supabase.from("dms").update({
-      lastmsg: message,
-    }).eq("id", dmId);
-
-    // Push notification to receiver (stored globally; in prod use FCM)
+    await supabase.from("dms").update({ lastmsg: message }).eq("id", dmId);
     pushNotification(activeDMUser.id, `New DM from ${currentUserDoc?.username}`);
 
   } catch (err) {
     input.value = message;
     showToast("Failed to send message", "error");
+  } finally {
+    _dmSending = false;
+    if (sendBtn) sendBtn.disabled = false;
   }
 };
 

@@ -425,7 +425,7 @@
             <input id="chat-image-input" type="file" accept="image/*" class="hidden" onchange="previewChatImage(event)" />
           </label>
           <input id="chat-input" type="text" class="form-input flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendChatMessage()" onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'nearest'}),300)" />
-          <button onclick="sendChatMessage()" class="btn-lime px-5 py-2">
+          <button id="chat-send-btn" onclick="sendChatMessage()" class="btn-lime px-5 py-2">
             <i data-lucide="send" class="w-4 h-4"></i>
           </button>
         </div>
