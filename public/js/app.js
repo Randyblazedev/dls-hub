@@ -823,11 +823,16 @@ async function loadComments(postId) {
 
 window.submitComment = async function (postId) {
   const input   = document.getElementById(`comment-input-${postId}`);
+  const btn     = document.querySelector(`#comments-${postId} .btn-lime`);
   const content = input.value.trim();
   if (!content || !currentUser) return;
+  if (btn?.disabled) return; // prevent double-tap
+
+  // Disable while submitting
+  if (btn) { btn.disabled = true; btn.textContent = "..."; }
+  input.disabled = true;
 
   try {
-    // Insert comment row
     const { error } = await supabase.from("comments").insert({
       postid:       postId,
       authorid:     currentUser.id,
@@ -838,7 +843,6 @@ window.submitComment = async function (postId) {
     });
     if (error) throw error;
 
-    // Increment comment count on post and get author for notification
     const { data: post } = await supabase
       .from("posts").select("commentcount, authorid").eq("id", postId).single();
 
@@ -846,8 +850,6 @@ window.submitComment = async function (postId) {
       await supabase
         .from("posts").update({ commentcount: (post.commentcount || 0) + 1 })
         .eq("id", postId);
-
-      // Notify post author if not self
       if (post.authorid !== currentUser.id) {
         pushNotification(post.authorid, `${currentUserDoc?.username} commented on your post.`, postId);
       }
@@ -857,6 +859,9 @@ window.submitComment = async function (postId) {
     await loadComments(postId);
   } catch (err) {
     showToast("Failed to comment. Try again.", "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Send"; }
+    input.disabled = false;
   }
 };
 
@@ -864,11 +869,16 @@ window.submitComment = async function (postId) {
 //  GLOBAL CHAT
 // ═══════════════════════════════════════════════════════════
 
+// Keep renderedIds outside initChat so it survives navigating away and back.
+// Without this, each call to initChat() created a fresh empty Set, causing
+// all previously-rendered messages to be re-appended on the next poll.
+let chatRenderedIds = new Set();
+
 function initChat() {
   const container = document.getElementById("chat-messages");
   container.innerHTML = `<div class="text-center text-mist py-12"><i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i>Loading chat...</div>`;
   lucide.createIcons();
-  const renderedIds = new Set();
+  chatRenderedIds = new Set(); // reset only when explicitly re-entering chat
 
   async function fetchChat() {
     try {
@@ -879,27 +889,23 @@ function initChat() {
       if (error) throw error;
 
       if (!data || !data.length) {
-        if (!renderedIds.size) {
+        if (!chatRenderedIds.size) {
           container.innerHTML = `<p class="text-mist text-center py-12">No messages yet. Say something!</p>`;
         }
         return;
       }
 
-      // Was the user already near the bottom before we add anything?
-      // (must check BEFORE appending, since appending changes scrollHeight)
       const wasNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
-      const isFirstLoad = renderedIds.size === 0;
+      const isFirstLoad = chatRenderedIds.size === 0;
 
-      // Clear the "no messages yet" placeholder (if any) once real data arrives
       if (isFirstLoad) container.innerHTML = "";
 
       let addedNew = false;
       data.forEach(m => {
-        if (!renderedIds.has(m.id)) {
-          renderedIds.add(m.id);
+        if (!chatRenderedIds.has(m.id)) {
+          chatRenderedIds.add(m.id);
           appendChatMessage(container, m);
           addedNew = true;
-          // Play sound for new messages from others
           if (currentUser && m.authorid !== currentUser.id && lastChatMsgId) {
             playNotifSound();
           }
@@ -907,10 +913,6 @@ function initChat() {
       });
       if (data.length) lastChatMsgId = data[data.length - 1].id;
 
-      // Only jump to the bottom when something new actually arrived, and
-      // only if the user hadn't scrolled up to read older messages — the
-      // 5s safety-net poll runs constantly, so without this check it would
-      // yank the user back to the bottom every few seconds regardless.
       if (addedNew && (isFirstLoad || wasNearBottom)) {
         container.scrollTop = container.scrollHeight;
       }
@@ -1446,25 +1448,36 @@ async function pushNotification(recipientUid, text, postId = null) {
 /** Fetch this user's own notifications and render them. */
 async function loadNotifications() {
   if (!currentUser) return;
-  const listEl  = document.getElementById("notif-list");
-  const badge   = document.getElementById("notif-badge");
+  const listEl = document.getElementById("notif-list");
+  const badge  = document.getElementById("notif-badge");
   if (!listEl) return;
 
   try {
-    const { data, error } = await supabase
+    // Try 'created_at' first (most common Supabase default), fall back to 'timestamp'
+    let result = await supabase
       .from("notifications").select("*")
       .eq("userid", currentUser.id)
-      .order("timestamp", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(20);
-    if (error) throw error;
 
-    notifications = data || [];
+    // If created_at doesn't exist, try timestamp column
+    if (result.error && result.error.message?.includes("created_at")) {
+      result = await supabase
+        .from("notifications").select("*")
+        .eq("userid", currentUser.id)
+        .order("timestamp", { ascending: false })
+        .limit(20);
+    }
+
+    if (result.error) throw result.error;
+
+    notifications = result.data || [];
     const unreadCount = notifications.filter(n => !n.read).length;
     if (badge) badge.classList.toggle("hidden", unreadCount === 0);
-
     renderNotifications(listEl);
   } catch (err) {
-    listEl.innerHTML = `<p class="p-4 text-center text-coral text-xs">Failed to load notifications.</p>`;
+    console.error("NOTIF LOAD ERROR:", err);
+    listEl.innerHTML = `<p class="p-4 text-center text-coral text-xs">Failed to load notifications: ${escHtml(err.message || "")}</p>`;
   }
 }
 
@@ -1492,12 +1505,26 @@ function startNotifications() {
 function playNotifSoundOnNewRow() {
   if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
   let knownIds = new Set(notifications.map(n => n.id));
+  let orderCol = "created_at"; // will switch to 'timestamp' if needed
+
   notifUnsubscribe = subscribeChanges("notifications", async () => {
-    const { data } = await supabase
+    let result = await supabase
       .from("notifications").select("*")
       .eq("userid", currentUser.id)
-      .order("timestamp", { ascending: false })
+      .order(orderCol, { ascending: false })
       .limit(20);
+
+    // Switch column name permanently if wrong
+    if (result.error && result.error.message?.includes(orderCol)) {
+      orderCol = orderCol === "created_at" ? "timestamp" : "created_at";
+      result = await supabase
+        .from("notifications").select("*")
+        .eq("userid", currentUser.id)
+        .order(orderCol, { ascending: false })
+        .limit(20);
+    }
+
+    const data = result.data;
     if (data) {
       const hasNew = data.some(n => !knownIds.has(n.id));
       if (hasNew) playNotifSound();
