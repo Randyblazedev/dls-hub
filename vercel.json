@@ -7,7 +7,13 @@
     }
   ],
   "routes": [
-    { "src": "/public/(.*)", "dest": "/public/$1" },
+    { "src": "/public/js/(.*)", "dest": "/public/js/$1" },
+    { "src": "/public/css/(.*)", "dest": "/public/css/$1" },
+    { "src": "/public/images/(.*)", "dest": "/public/images/$1" },
+    { "src": "/public/icons/(.*)", "dest": "/public/icons/$1" },
+    { "src": "/public/sounds/(.*)", "dest": "/public/sounds/$1" },
+    { "src": "/manifest.json", "dest": "/manifest.json" },
+    { "src": "/sw.js", "dest": "/sw.js" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

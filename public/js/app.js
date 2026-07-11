@@ -4,9 +4,10 @@
 //  Migrated from Firebase → Supabase
 // ═══════════════════════════════════════════════════════════
 
-import { supabase, getCurrentUser, onAuthChange } from "./supabase-config.js";
-window.supabase = supabase; // expose for features.js
-window.onAuthChange = onAuthChange; // expose for features.js
+// Use globals set by supabase-config.js
+var supabase = window._supabaseClient;
+var onAuthChange = window.onAuthChange;
+window.supabase = supabase;
 
 // ── Global state ──────────────────────────────────────────
 let currentUser   = null;   // Supabase auth user
@@ -1763,6 +1764,8 @@ function updateNotifBadge(count) {
     badge.classList.add("hidden");
   }
 }
+
+function renderNotifications(listEl) {
   if (!notifications.length) {
     listEl.innerHTML = `<p class="p-4 text-center text-mist text-sm">No notifications yet</p>`;
     return;
