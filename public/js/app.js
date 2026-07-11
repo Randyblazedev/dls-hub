@@ -1722,8 +1722,10 @@ function startNotifications() {
 function playNotifSoundOnNewRow() {
   if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
   let knownIds = new Set(notifications.map(n => n.id));
-  let orderCol = "created_at"; // will switch to 'timestamp' if needed
+  let orderCol = "created_at";
 
+  // CRITICAL: filter to only THIS user's notifications so realtime
+  // fires on YOUR rows, not on everyone else's notification inserts.
   notifUnsubscribe = subscribeChanges("notifications", async () => {
     let result = await supabase
       .from("notifications").select("*")
@@ -1731,7 +1733,6 @@ function playNotifSoundOnNewRow() {
       .order(orderCol, { ascending: false })
       .limit(20);
 
-    // Switch column name permanently if wrong
     if (result.error && result.error.message?.includes(orderCol)) {
       orderCol = orderCol === "created_at" ? "timestamp" : "created_at";
       result = await supabase
@@ -1743,8 +1744,21 @@ function playNotifSoundOnNewRow() {
 
     const data = result.data;
     if (data) {
-      const hasNew = data.some(n => !knownIds.has(n.id));
-      if (hasNew) playNotifSound();
+      const newOnes = data.filter(n => !knownIds.has(n.id));
+      if (newOnes.length) {
+        playNotifSound();
+        // Show a toast for each new notification so user knows immediately
+        newOnes.forEach(n => {
+          showToast(`🔔 ${n.text || "New notification"}`);
+        });
+        // Flash the badge red
+        const badge = document.getElementById("notif-badge");
+        if (badge) {
+          badge.classList.remove("hidden");
+          badge.classList.add("animate-bounce");
+          setTimeout(() => badge.classList.remove("animate-bounce"), 2000);
+        }
+      }
       knownIds = new Set(data.map(n => n.id));
       notifications = data;
       const listEl = document.getElementById("notif-list");
@@ -1752,7 +1766,7 @@ function playNotifSoundOnNewRow() {
       if (listEl) renderNotifications(listEl);
       if (badge) badge.classList.toggle("hidden", !data.some(n => !n.read));
     }
-  }, { filter: `userid=eq.${currentUser.id}` });
+  }, { filter: `userid=eq.${currentUser.id}` }); // ← THIS was the missing piece
 }
 
 function stopNotifications() {
