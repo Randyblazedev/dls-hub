@@ -210,6 +210,7 @@ onAuthChange(async (user) => {
 
     loadHomeStats();
     startNotifications();
+    startChatBroadcast();
   } else {
     currentUserDoc = null;
     window.currentUserDoc = null;
@@ -220,6 +221,7 @@ onAuthChange(async (user) => {
     mobileNavAuth.classList.add("hidden");
 
     stopNotifications();
+    stopChatBroadcast();
     if (window.cleanupPresence) window.cleanupPresence();
 
     // Reset home page to guest state
@@ -1038,6 +1040,49 @@ window.submitComment = async function (postId) {
 };
 
 // ═══════════════════════════════════════════════════════════
+//  GLOBAL CHAT BROADCAST NOTIFICATIONS
+//  Uses Supabase Realtime broadcast (no DB writes) so all
+//  online users get alerted when someone posts in chat.
+// ═══════════════════════════════════════════════════════════
+
+let chatBroadcastChannel = null;
+
+function startChatBroadcast() {
+  if (chatBroadcastChannel) return;
+  chatBroadcastChannel = supabase.channel("community-chat-activity");
+
+  chatBroadcastChannel
+    .on("broadcast", { event: "new-message" }, (payload) => {
+      // Only notify if we're NOT on the chat page and it's not our own message
+      const chatPage = document.getElementById("page-chat");
+      const isOnChat = chatPage && !chatPage.classList.contains("hidden");
+      if (isOnChat) return;
+      if (payload.payload?.authorid === currentUser?.id) return;
+
+      const author = payload.payload?.authorname || "Someone";
+      const preview = (payload.payload?.content || "").slice(0, 50);
+      showToast(`💬 ${author}: ${preview}`);
+      playNotifSound();
+
+      // Flash the notification badge
+      const badge = document.getElementById("notif-badge");
+      if (badge) {
+        badge.classList.remove("hidden");
+        badge.classList.add("animate-bounce");
+        setTimeout(() => badge.classList.remove("animate-bounce"), 2000);
+      }
+    })
+    .subscribe();
+}
+
+function stopChatBroadcast() {
+  if (chatBroadcastChannel) {
+    supabase.removeChannel(chatBroadcastChannel);
+    chatBroadcastChannel = null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 //  GLOBAL CHAT
 // ═══════════════════════════════════════════════════════════
 
@@ -1244,6 +1289,20 @@ window.sendChatMessage = async function () {
     });
     if (error) throw error;
     cancelChatReply();
+
+    // Broadcast to all online users so they get a live notification
+    // even if they're not on the chat page — no DB writes needed
+    if (chatBroadcastChannel) {
+      chatBroadcastChannel.send({
+        type: "broadcast",
+        event: "new-message",
+        payload: {
+          authorid:   currentUser.id,
+          authorname: currentUserDoc?.username || "Someone",
+          content:    message,
+        },
+      });
+    }
   } catch (err) {
     input.value = message; // restore on failure
     showToast("Failed to send message", "error");
