@@ -1,10 +1,12 @@
 // ═══════════════════════════════════════════════════════════
-//  app.js  — DLS Hub Main Application
+//  app.js  — DLS Hub Main Application (Supabase Edition)
+//  Handles: routing, auth, feed, chat, DMs, leaderboards
+//  Migrated from Firebase → Supabase
 // ═══════════════════════════════════════════════════════════
 
-const supabase     = window._supabaseClient;
-const onAuthChange = window.onAuthChange;
-window.supabase    = supabase;
+import { supabase, getCurrentUser, onAuthChange } from "./supabase-config.js";
+window.supabase = supabase; // expose for features.js
+window.onAuthChange = onAuthChange; // expose for features.js
 
 // ── Global state ──────────────────────────────────────────
 let currentUser   = null;   // Supabase auth user
@@ -95,7 +97,7 @@ function subscribeChanges(table, fetchFn, opts = {}) {
 /** Navigates to a page by name */
 window.navigate = function (page) {
   // Guard: redirect unauthenticated users away from protected pages
-  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "admin"];
+  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "squads", "predictions", "potw", "admin"];
   if (protected_.includes(page) && !currentUser) {
     navigate("login");
     showToast("Please log in first", "error");
@@ -124,6 +126,9 @@ window.navigate = function (page) {
   if (page === "profile")      initProfile();
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
+  if (page === "squads")       initSquads();
+  if (page === "predictions")  initPredictions();
+  if (page === "potw")         initPOTW();
   if (page === "admin")        initAdmin();
 
   // Re-init icons after DOM changes
@@ -1761,8 +1766,6 @@ function updateNotifBadge(count) {
     badge.classList.add("hidden");
   }
 }
-
-function renderNotifications(listEl) {
   if (!notifications.length) {
     listEl.innerHTML = `<p class="p-4 text-center text-mist text-sm">No notifications yet</p>`;
     return;
