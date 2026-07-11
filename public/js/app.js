@@ -1068,10 +1068,11 @@ function startChatBroadcast() {
       showToast(`💬 ${author}: ${preview}`);
       playNotifSound();
 
-      // Flash the notification badge
+      // Increment badge count
+      const currentCount = parseInt(document.getElementById("notif-badge")?.textContent || "0") || 0;
+      updateNotifBadge(currentCount + 1);
       const badge = document.getElementById("notif-badge");
       if (badge) {
-        badge.classList.remove("hidden");
         badge.classList.add("animate-bounce");
         setTimeout(() => badge.classList.remove("animate-bounce"), 2000);
       }
@@ -1747,7 +1748,7 @@ async function loadNotifications() {
 
     notifications = result.data || [];
     const unreadCount = notifications.filter(n => !n.read).length;
-    if (badge) badge.classList.toggle("hidden", unreadCount === 0);
+    updateNotifBadge(unreadCount);
     renderNotifications(listEl);
   } catch (err) {
     console.error("NOTIF LOAD ERROR:", err);
@@ -1755,7 +1756,16 @@ async function loadNotifications() {
   }
 }
 
-function renderNotifications(listEl) {
+function updateNotifBadge(count) {
+  const badge = document.getElementById("notif-badge");
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count > 99 ? "99+" : count;
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
   if (!notifications.length) {
     listEl.innerHTML = `<p class="p-4 text-center text-mist text-sm">No notifications yet</p>`;
     return;
@@ -1811,14 +1821,12 @@ function playNotifSoundOnNewRow() {
       const newOnes = data.filter(n => !knownIds.has(n.id));
       if (newOnes.length) {
         playNotifSound();
-        // Show a toast for each new notification so user knows immediately
         newOnes.forEach(n => {
           showToast(`🔔 ${n.text || "New notification"}`);
         });
-        // Flash the badge red
+        // Bounce the badge to draw attention
         const badge = document.getElementById("notif-badge");
         if (badge) {
-          badge.classList.remove("hidden");
           badge.classList.add("animate-bounce");
           setTimeout(() => badge.classList.remove("animate-bounce"), 2000);
         }
@@ -1826,11 +1834,10 @@ function playNotifSoundOnNewRow() {
       knownIds = new Set(data.map(n => n.id));
       notifications = data;
       const listEl = document.getElementById("notif-list");
-      const badge  = document.getElementById("notif-badge");
       if (listEl) renderNotifications(listEl);
-      if (badge) badge.classList.toggle("hidden", !data.some(n => !n.read));
+      updateNotifBadge(data.filter(n => !n.read).length);
     }
-  }, { filter: `userid=eq.${currentUser.id}` }); // ← THIS was the missing piece
+  }, { filter: `userid=eq.${currentUser.id}` });
 }
 
 function stopNotifications() {
@@ -1843,8 +1850,8 @@ window.toggleNotifications = async function () {
   panel.classList.toggle("hidden");
 
   if (!panel.classList.contains("hidden") && currentUser) {
-    // Mark all as read when the panel is opened
-    document.getElementById("notif-badge").classList.add("hidden");
+    // Mark all as read when panel opens — badge goes to 0
+    updateNotifBadge(0);
     const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
     if (unreadIds.length) {
       await supabase.from("notifications").update({ read: true }).in("id", unreadIds);
@@ -1860,7 +1867,7 @@ window.clearNotifications = async function () {
   notifications = [];
   const listEl = document.getElementById("notif-list");
   if (listEl) renderNotifications(listEl);
-  document.getElementById("notif-badge").classList.add("hidden");
+  updateNotifBadge(0);
 };
 
 // ═══════════════════════════════════════════════════════════
