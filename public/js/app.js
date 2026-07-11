@@ -728,10 +728,21 @@ function buildPostCard(postId, p, isProfile = false) {
       <!-- Comment section (collapsed) -->
       <div id="comments-${postId}" class="hidden mt-4 border-t border-line pt-4">
         <div id="comment-list-${postId}" class="space-y-3 mb-3"></div>
+        <!-- Reply preview bar (like chat) -->
+        <div id="comment-reply-preview-${postId}" class="hidden mb-2 bg-turf border border-line border-l-2 border-l-lime rounded-lg px-3 py-2 flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-lime text-xs font-medium">Replying to <span class="comment-reply-author"></span></p>
+            <p class="comment-reply-text text-mist text-xs truncate"></p>
+          </div>
+          <button onclick="cancelCommentReply('${postId}')" class="text-mist hover:text-coral text-xs shrink-0">✕</button>
+        </div>
+        <!-- @mention dropdown -->
+        <div id="mention-dropdown-${postId}" class="hidden bg-turf border border-line rounded-xl overflow-hidden mb-2 max-h-40 overflow-y-auto"></div>
         <div class="flex gap-2">
           <input id="comment-input-${postId}" type="text" class="form-input flex-1 py-2 text-sm"
-            placeholder="Add a comment..." 
+            placeholder="Add a comment..."
             onkeydown="if(event.key==='Enter')submitComment('${postId}')"
+            oninput="handleCommentInput(this,'${postId}')"
             onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'nearest'}),300)" />
           <button onclick="submitComment('${postId}')" class="btn-lime px-3 py-2 text-xs">Send</button>
         </div>
@@ -912,6 +923,12 @@ async function loadComments(postId) {
       const canDeleteComment = isMine || currentUserDoc?.is_admin;
 
       // Format @mentions in blue bold
+      const replyBlock = c.replytoid ? `
+        <div class="border-l-2 border-lime/50 pl-2 mb-1 opacity-70">
+          <p class="text-lime text-xs font-medium">${escHtml(c.replytoauthor || "")}</p>
+          <p class="text-xs truncate">${escHtml(c.replytotext || "")}</p>
+        </div>` : "";
+
       const formattedContent = escHtml(c.content).replace(/@(\w+)/g, '<span class="text-blue-400 font-semibold">@$1</span>');
 
       const el = document.createElement("div");
@@ -927,24 +944,16 @@ async function loadComments(postId) {
             </div>
             ${canDeleteComment ? `<button onclick="deleteComment('${c.id}')" class="text-coral text-xs hover:text-white"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
           </div>
+          ${replyBlock}
           <p class="text-ice text-xs mt-0.5">${formattedContent}</p>
         </div>`;
       listEl.appendChild(el);
       lucide.createIcons();
 
-      // Swipe-to-reply
+      // Swipe-to-reply — shows quoted preview bar like chat/DMs
       const bubbleEl = el.querySelector(".flex-1");
       enableSwipeToReply(el, bubbleEl, () => {
-        const postSection = listEl.closest('[id^="comments-"]');
-        const pid = postSection?.id?.replace("comments-", "");
-        if (!pid) return;
-        const input = document.getElementById(`comment-input-${pid}`);
-        if (input) {
-          input.dataset.replyTo = c.authorname;
-          input.placeholder = `Replying to ${c.authorname}...`;
-          input.focus();
-          setTimeout(() => input.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
-        }
+        startCommentReply(postId, c.id, c.authorname, (c.content || "").slice(0, 80));
       });
     });
   } catch (err) {
@@ -954,28 +963,54 @@ async function loadComments(postId) {
   }
 }
 
+const pendingCommentReplies = {}; // keyed by postId
+
+window.startCommentReply = function(postId, commentId, authorName, preview) {
+  pendingCommentReplies[postId] = { id: commentId, author: authorName, text: preview };
+  const bar = document.getElementById(`comment-reply-preview-${postId}`);
+  if (bar) {
+    bar.querySelector(".comment-reply-author").textContent = authorName;
+    bar.querySelector(".comment-reply-text").textContent = preview;
+    bar.classList.remove("hidden");
+  }
+  const input = document.getElementById(`comment-input-${postId}`);
+  if (input) {
+    input.placeholder = `Reply to ${authorName}...`;
+    input.focus();
+    setTimeout(() => input.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
+  }
+};
+
+window.cancelCommentReply = function(postId) {
+  delete pendingCommentReplies[postId];
+  const bar = document.getElementById(`comment-reply-preview-${postId}`);
+  if (bar) bar.classList.add("hidden");
+  const input = document.getElementById(`comment-input-${postId}`);
+  if (input) input.placeholder = "Add a comment...";
+};
+
 window.submitComment = async function (postId) {
   const input   = document.getElementById(`comment-input-${postId}`);
   const btn     = document.querySelector(`#comments-${postId} .btn-lime`);
-  const replyTo = input.dataset.replyTo || null;
-  const rawContent = input.value.trim();
-  if (!rawContent || !currentUser) return;
+  const content = input.value.trim();
+  const reply   = pendingCommentReplies[postId] || null;
+  if (!content || !currentUser) return;
   if (btn?.disabled) return;
-
-  // Prefix with @username if replying
-  const content = replyTo ? `@${replyTo} ${rawContent}` : rawContent;
 
   if (btn) { btn.disabled = true; btn.textContent = "..."; }
   input.disabled = true;
 
   try {
     const { error } = await supabase.from("comments").insert({
-      postid:       postId,
-      authorid:     currentUser.id,
-      authorname:   currentUserDoc?.username || "Anonymous",
-      authoravatar: currentUserDoc?.avatar   || "",
+      postid:        postId,
+      authorid:      currentUser.id,
+      authorname:    currentUserDoc?.username || "Anonymous",
+      authoravatar:  currentUserDoc?.avatar   || "",
       content,
-      created_at:   new Date().toISOString(),
+      replytoid:     reply?.id     || null,
+      replytoauthor: reply?.author || null,
+      replytotext:   reply?.text   || null,
+      created_at:    new Date().toISOString(),
     });
     if (error) throw error;
 
@@ -992,10 +1027,7 @@ window.submitComment = async function (postId) {
     }
 
     input.value = "";
-    // Clear reply state
-    delete input.dataset.replyTo;
-    input.placeholder = "Add a comment...";
-    // loadComments is surgical — just call it, it will append the new comment
+    cancelCommentReply(postId);
     await loadComments(postId);
   } catch (err) {
     showToast("Failed to comment. Try again.", "error");
@@ -2035,6 +2067,57 @@ window.viewPublicProfile = async function(uid, username) {
     document.getElementById("pub-profile-content").innerHTML = `<p class="text-coral text-sm">Failed to load profile.</p>`;
   }
 };
+// ── @mention dropdown for comments ─────────────────────────
+window.handleCommentInput = async function(input, postId) {
+  const val   = input.value;
+  const caret = input.selectionStart;
+  const atIdx = val.lastIndexOf("@", caret - 1);
+  const dropdown = document.getElementById(`mention-dropdown-${postId}`);
+  if (!dropdown) return;
+
+  if (atIdx === -1) { dropdown.classList.add("hidden"); return; }
+
+  const query = val.slice(atIdx + 1, caret).toLowerCase();
+
+  try {
+    let req = supabase.from("public_profiles").select("uid, username, avatar").limit(6);
+    if (query) req = req.ilike("username", `${query}%`);
+    const { data } = await req;
+    if (!data?.length) { dropdown.classList.add("hidden"); return; }
+
+    dropdown.innerHTML = data.map(u => {
+      const av = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}&background=0f1f17&color=b5ff47&size=40`;
+      return `<button type="button" class="flex items-center gap-2 w-full px-3 py-2 hover:bg-white/10 text-left transition"
+        onclick="insertMention('${postId}','${escHtml(u.username)}')">
+        <img src="${escHtml(av)}" class="w-6 h-6 rounded-full object-cover shrink-0" />
+        <span class="text-ice text-sm">${escHtml(u.username)}</span>
+      </button>`;
+    }).join("");
+    dropdown.classList.remove("hidden");
+  } catch (_) { dropdown.classList.add("hidden"); }
+};
+
+window.insertMention = function(postId, username) {
+  const input    = document.getElementById(`comment-input-${postId}`);
+  const dropdown = document.getElementById(`mention-dropdown-${postId}`);
+  if (!input) return;
+  const val   = input.value;
+  const caret = input.selectionStart;
+  const atIdx = val.lastIndexOf("@", caret - 1);
+  input.value  = val.slice(0, atIdx) + `@${username} ` + val.slice(caret);
+  input.focus();
+  const newPos = atIdx + username.length + 2;
+  input.setSelectionRange(newPos, newPos);
+  if (dropdown) dropdown.classList.add("hidden");
+};
+
+// Close mention dropdowns on outside click
+document.addEventListener("click", (e) => {
+  if (!e.target.closest('[id^="mention-dropdown-"]') && !e.target.closest('[id^="comment-input-"]')) {
+    document.querySelectorAll('[id^="mention-dropdown-"]').forEach(d => d.classList.add("hidden"));
+  }
+});
+
 // Initialise Lucide icons on first load
 document.addEventListener("DOMContentLoaded", () => {
   lucide.createIcons();
