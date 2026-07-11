@@ -97,7 +97,7 @@ function subscribeChanges(table, fetchFn, opts = {}) {
 /** Navigates to a page by name */
 window.navigate = function (page) {
   // Guard: redirect unauthenticated users away from protected pages
-  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "squads", "predictions", "potw", "admin"];
+  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "admin"];
   if (protected_.includes(page) && !currentUser) {
     navigate("login");
     showToast("Please log in first", "error");
@@ -126,9 +126,6 @@ window.navigate = function (page) {
   if (page === "profile")      initProfile();
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
-  if (page === "squads")       initSquads();
-  if (page === "predictions")  initPredictions();
-  if (page === "potw")         initPOTW();
   if (page === "admin")        initAdmin();
 
   // Re-init icons after DOM changes

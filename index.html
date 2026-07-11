@@ -74,9 +74,7 @@
         <button onclick="navigate('chat')"          class="nav-link hover:text-ice transition">Community Chat</button>
         <button onclick="navigate('dm')"            class="nav-link hover:text-ice transition">Messages</button>
         <button onclick="navigate('leaderboards')"  class="nav-link hover:text-ice transition">Leaderboards</button>
-        <button onclick="navigate('squads')"       class="nav-link hover:text-ice transition">Squads</button>
-        <button onclick="navigate('predictions')"   class="nav-link hover:text-ice transition">Predictions</button>
-        <button onclick="navigate('potw')"          class="nav-link hover:text-ice transition">POTW</button>
+
       </div>
 
       <!-- Right side: auth buttons OR avatar -->
@@ -136,9 +134,7 @@
         <button onclick="navigate('chat');toggleMobileMenu()"         class="text-left hover:text-ice">Community Chat</button>
         <button onclick="navigate('dm');toggleMobileMenu()"           class="text-left hover:text-ice">Messages</button>
         <button onclick="navigate('leaderboards');toggleMobileMenu()" class="text-left hover:text-ice">Leaderboards</button>
-        <button onclick="navigate('squads');toggleMobileMenu()"       class="text-left hover:text-ice">Squads</button>
-        <button onclick="navigate('predictions');toggleMobileMenu()"  class="text-left hover:text-ice">Predictions</button>
-        <button onclick="navigate('potw');toggleMobileMenu()"         class="text-left hover:text-ice">POTW</button>
+
         <button onclick="navigate('admin');toggleMobileMenu()"        class="text-left hover:text-ice">Admin</button>
         <button onclick="navigate('profile');toggleMobileMenu()"      class="text-left hover:text-ice">My Profile</button>
         <button onclick="handleSignOut()"                              class="text-left text-coral">Sign Out</button>
@@ -536,173 +532,6 @@
     </div>
 
     <!-- ── SQUADS ── -->
-    <div id="page-squads" class="page-view hidden">
-      <div class="max-w-4xl mx-auto px-4 py-20">
-        <h1 class="font-display text-4xl text-lime mb-2">Squads</h1>
-        <p class="text-mist mb-6">Share your Dream League Soccer squad with the community</p>
-
-        <!-- Create squad form -->
-        <div class="bg-turf border border-line rounded-2xl p-5 mb-8">
-          <h3 class="font-display text-lg text-lime mb-4">Create Squad</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="form-label">Squad Name</label>
-              <input id="squad-name" type="text" class="form-input" placeholder="e.g. Thunder XI" />
-            </div>
-            <div>
-              <label class="form-label">Formation</label>
-              <select id="squad-formation" class="form-input">
-                <option value="4-4-2">4-4-2</option>
-                <option value="4-3-3">4-3-3</option>
-                <option value="3-5-2">3-5-2</option>
-                <option value="4-2-3-1">4-2-3-1</option>
-                <option value="5-3-2">5-3-2</option>
-                <option value="4-1-4-1">4-1-4-1</option>
-                <option value="3-4-3">3-4-3</option>
-              </select>
-            </div>
-          </div>
-          <div class="mb-4">
-            <label class="form-label">Players (one per line or comma-separated)</label>
-            <textarea id="squad-players" class="form-input" rows="4" placeholder="GK: Neuer&#10;DEF: Van Dijk, Ramos, ...&#10;MID: De Bruyne, Modric, ...&#10;FWD: Messi, Haaland, ..."></textarea>
-          </div>
-          <div class="mb-4">
-            <label class="form-label">Notes / Tactics</label>
-            <textarea id="squad-desc" class="form-input" rows="2" placeholder="Describe your playstyle..."></textarea>
-          </div>
-          <div class="mb-4">
-            <label class="cursor-pointer text-mist hover:text-lime transition flex items-center gap-2 text-sm">
-              <i data-lucide="image" class="w-4 h-4"></i><span>Screenshot (optional)</span>
-              <input id="squad-image-input" type="file" accept="image/*" class="hidden" onchange="previewSquadImage(event)" />
-            </label>
-            <div id="squad-image-preview" class="hidden mt-2 relative inline-block">
-              <img id="squad-preview-img" class="max-h-40 rounded-lg object-cover" />
-              <button onclick="removeSquadImage()" class="absolute top-1 right-1 bg-coral text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
-            </div>
-          </div>
-          <button onclick="createSquad()" class="btn-lime px-6 py-2">Share Squad</button>
-        </div>
-
-        <!-- Squads grid -->
-        <div id="squads-grid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <p class="text-mist text-center py-12 col-span-2">Loading squads...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── PREDICTIONS ── -->
-    <div id="page-predictions" class="page-view hidden">
-      <div class="max-w-3xl mx-auto px-4 py-20">
-        <h1 class="font-display text-4xl text-lime mb-2">Predictions</h1>
-        <p class="text-mist mb-6">Predict match scores and earn points</p>
-
-        <!-- Admin: Create match -->
-        <div id="pred-admin-form" class="hidden bg-turf border border-line rounded-2xl p-5 mb-8">
-          <h3 class="font-display text-lg text-lime mb-4">Create Match</h3>
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="form-label">Team A</label><input id="pred-team-a" type="text" class="form-input" placeholder="e.g. Barcelona" /></div>
-            <div><label class="form-label">Team B</label><input id="pred-team-b" type="text" class="form-input" placeholder="e.g. Real Madrid" /></div>
-          </div>
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="form-label">Match Date</label><input id="pred-match-date" type="datetime-local" class="form-input" /></div>
-            <div><label class="form-label">Deadline</label><input id="pred-deadline" type="datetime-local" class="form-input" /></div>
-          </div>
-          <button onclick="createPredictionMatch()" class="btn-lime px-6 py-2">Create Match</button>
-        </div>
-
-        <!-- Upcoming matches -->
-        <div id="pred-matches" class="space-y-5">
-          <p class="text-mist text-center py-12">Loading matches...</p>
-        </div>
-
-        <!-- Predictions leaderboard -->
-        <div class="mt-10">
-          <h3 class="font-display text-2xl text-lime mb-4">Predictions Leaderboard</h3>
-          <div id="pred-leaderboard" class="bg-turf border border-line rounded-2xl p-5">
-            <p class="text-mist text-sm">Loading...</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── PLAYER OF THE WEEK ── -->
-    <div id="page-potw" class="page-view hidden">
-      <div class="max-w-3xl mx-auto px-4 py-20">
-        <h1 class="font-display text-4xl text-lime mb-2">Player of the Week</h1>
-        <p class="text-mist mb-6">Nominate and vote for the best DLS player this week</p>
-
-        <!-- Nomination form -->
-        <div class="bg-turf border border-line rounded-2xl p-5 mb-8">
-          <h3 class="font-display text-lg text-lime mb-4">Nominate a Player</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div><label class="form-label">Player Name</label><input id="potw-player" type="text" class="form-input" placeholder="e.g. Haaland" /></div>
-            <div><label class="form-label">Team</label><input id="potw-team" type="text" class="form-input" placeholder="e.g. Man City" /></div>
-            <div><label class="form-label">Rating (1-10)</label><input id="potw-rating" type="number" min="1" max="10" step="0.1" class="form-input" placeholder="9.5" /></div>
-          </div>
-          <div class="mb-4">
-            <label class="form-label">Why this player?</label>
-            <textarea id="potw-reason" class="form-input" rows="2" placeholder="Hat-trick, insane dribbling, game-winning performance..."></textarea>
-          </div>
-          <button onclick="submitPOTWNomination()" class="btn-lime px-6 py-2">Nominate</button>
-        </div>
-
-        <!-- Current week's winner -->
-        <div id="potw-winner" class="hidden bg-turf border border-lime/30 rounded-2xl p-6 mb-8 text-center gold-glow">
-          <span class="text-xs uppercase tracking-widest text-lime">🏆 This Week's Winner</span>
-          <h2 id="potw-winner-name" class="font-display text-4xl text-lime mt-2"></h2>
-          <p id="potw-winner-detail" class="text-mist text-sm mt-1"></p>
-        </div>
-
-        <!-- Nominations list -->
-        <div id="potw-nominations" class="space-y-4">
-          <p class="text-mist text-center py-12">Loading nominations...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── ADMIN PANEL ── -->
-    <div id="page-admin" class="page-view hidden">
-      <div id="admin-content" class="max-w-3xl mx-auto px-4 py-20">
-        <h1 class="font-display text-4xl text-lime mb-2">Admin Panel</h1>
-        <p class="text-mist mb-6">Manage reports, featured content, and users</p>
-
-        <!-- Stats -->
-        <div id="admin-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"></div>
-
-        <!-- Reports -->
-        <div class="mb-10">
-          <h3 class="font-display text-xl text-lime mb-4">📋 Reports</h3>
-          <div id="admin-reports" class="bg-turf border border-line rounded-2xl p-5">
-            <p class="text-mist text-sm">Loading reports...</p>
-          </div>
-        </div>
-
-        <!-- Posts management -->
-        <div class="mb-10">
-          <h3 class="font-display text-xl text-lime mb-4">📝 All Posts</h3>
-          <div id="admin-posts" class="bg-turf border border-line rounded-2xl p-5 space-y-3 max-h-96 overflow-y-auto">
-            <p class="text-mist text-sm">Loading posts...</p>
-          </div>
-        </div>
-
-        <!-- Messages management -->
-        <div class="mb-10">
-          <h3 class="font-display text-xl text-lime mb-4">💬 Recent Chat Messages</h3>
-          <div id="admin-messages" class="bg-turf border border-line rounded-2xl p-5 space-y-3 max-h-96 overflow-y-auto">
-            <p class="text-mist text-sm">Loading messages...</p>
-          </div>
-        </div>
-
-        <!-- Users management -->
-        <div>
-          <h3 class="font-display text-xl text-lime mb-4">👥 Users</h3>
-          <div id="admin-users" class="bg-turf border border-line rounded-2xl p-5">
-            <p class="text-mist text-sm">Loading users...</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ═══════ TERMS OF SERVICE ═══════ -->
     <div id="page-terms" class="page-view hidden">
       <div class="max-w-3xl mx-auto py-8 px-4">
