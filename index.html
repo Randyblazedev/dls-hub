@@ -76,24 +76,27 @@
         <button onclick="navigate('leaderboards')"  class="nav-link hover:text-ice transition">Leaderboards</button>
       </div>
 
-      <!-- Right side: auth buttons OR avatar -->
-      <!-- Install app (PWA) -->
-      <button id="install-btn" onclick="installApp()" class="hidden items-center gap-1.5 btn-lime px-3 py-1.5 text-xs" title="Install DLS Hub">
-        <i data-lucide="download" class="w-3.5 h-3.5"></i> Install
-      </button>
-      <!-- Sound toggle -->
-      <button onclick="toggleSound()" class="p-2 text-mist hover:text-lime transition" title="Toggle sound">
-        <i data-lucide="volume-2" id="sound-icon" class="w-5 h-5"></i>
-      </button>
-      <!-- Online status -->
-      <span id="online-count" class="text-xs text-mist bg-turf border border-line rounded-full px-2 py-1 hidden"><span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span><span id="online-num">0</span> online</span>
-      <!-- Theme toggle (always visible) -->
-      <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
-        <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
-        <i data-lucide="moon" id="theme-icon-dark" class="w-5 h-5"></i>
-      </button>
+      <!-- Right side controls — always in a flex row so install button can't break layout -->
+      <div class="flex items-center gap-2 ml-auto">
 
-      <div class="flex items-center gap-3">
+        <!-- Install app (PWA) — hidden until installable -->
+        <button id="install-btn" onclick="installApp()" class="hidden items-center gap-1 border border-blue-500 text-blue-400 hover:bg-blue-500/10 px-3 py-1.5 rounded-lg text-xs font-medium transition" title="Install DLS Hub">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> Install
+        </button>
+
+        <!-- Sound toggle -->
+        <button onclick="toggleSound()" class="p-2 text-mist hover:text-lime transition" title="Toggle sound">
+          <i data-lucide="volume-2" id="sound-icon" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Online status -->
+        <span id="online-count" class="text-xs text-mist bg-turf border border-line rounded-full px-2 py-1 hidden"><span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span><span id="online-num">0</span> online</span>
+
+        <!-- Theme toggle -->
+        <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
+          <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
+          <i data-lucide="moon" id="theme-icon-dark" class="w-5 h-5"></i>
+        </button>
 
         <!-- Notification bell (logged-in only) -->
         <button id="notif-btn" class="hidden relative p-2 text-mist hover:text-lime" onclick="toggleNotifications()">
@@ -114,10 +117,11 @@
         </div>
 
         <!-- Auth buttons (logged-out) -->
-        <div id="auth-buttons">
-          <button onclick="navigate('login')"  class="text-sm text-mist hover:text-ice mr-3 transition">Log In</button>
+        <div id="auth-buttons" class="flex items-center gap-2">
+          <button onclick="navigate('login')" class="text-sm px-4 py-1.5 rounded-lg border border-blue-500 text-blue-400 hover:bg-blue-500/20 transition font-medium" style="box-shadow: 0 0 10px rgba(59,130,246,0.4)">Log In</button>
           <button onclick="navigate('signup')" class="btn-lime text-sm px-4 py-1.5">Sign Up</button>
         </div>
+
       </div>
 
       <!-- Mobile hamburger (hidden on mobile — use bottom nav) -->
