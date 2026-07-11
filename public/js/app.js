@@ -1,14 +1,7 @@
 // ═══════════════════════════════════════════════════════════
-//  app.js  — DLS Hub Main Application (Supabase Edition)
-//  Handles: routing, auth, feed, chat, DMs, leaderboards
-//  Migrated from Firebase → Supabase
+//  app.js  — DLS Hub Main Application
 // ═══════════════════════════════════════════════════════════
 
-// ═══════════════════════════════════════════════════════════
-//  app.js  — DLS Hub Main Application (Supabase Edition)
-// ═══════════════════════════════════════════════════════════
-
-// Wait for supabase-config.js to set up the client
 const supabase     = window._supabaseClient;
 const onAuthChange = window.onAuthChange;
 window.supabase    = supabase;

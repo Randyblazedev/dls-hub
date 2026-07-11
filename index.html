@@ -688,11 +688,11 @@
     <span id="toast-msg"></span>
   </div>
 
-  <!-- Supabase JS CDN -->
+  <!-- Supabase JS CDN — must load before our scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- App modules -->
-  <script defer src="public/js/supabase-config.js"></script>
-  <script defer src="public/js/app.js"></script>
-  <script defer src="public/js/features.js"></script>
+  <!-- App scripts — loaded in order, no defer/module -->
+  <script src="public/js/supabase-config.js"></script>
+  <script src="public/js/app.js"></script>
+  <script src="public/js/features.js"></script>
 </body>
 </html>
