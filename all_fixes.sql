@@ -116,3 +116,28 @@ alter table chat_messages add column if not exists replytotext text;
 alter table dm_messages add column if not exists replytoid uuid;
 alter table dm_messages add column if not exists replytoauthor text;
 alter table dm_messages add column if not exists replytotext text;
+
+-- 5. Web Push subscriptions table
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  userid     text NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+  endpoint   text NOT NULL UNIQUE,
+  p256dh     text NOT NULL,
+  auth       text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Users manage own push subs" ON push_subscriptions
+    FOR ALL USING (auth.uid()::text = userid);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Admins can read all push subs" ON push_subscriptions
+    FOR SELECT USING (is_admin_user(auth.uid()::text));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER PUBLICATION supabase_realtime ADD TABLE push_subscriptions;

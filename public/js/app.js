@@ -211,6 +211,8 @@ onAuthChange(async (user) => {
     loadHomeStats();
     startNotifications();
     startChatBroadcast();
+    // Ask for push permission and register subscription
+    setTimeout(registerPushSubscription, 2000); // slight delay so login flow completes first
   } else {
     currentUserDoc = null;
     window.currentUserDoc = null;
@@ -771,6 +773,7 @@ window.toggleLike = async function (postId) {
     newLikes = [...currentLikes, uid];
     if (post.authorid !== uid) {
       pushNotification(post.authorid, `${currentUserDoc?.username} liked your post!`, postId);
+      sendPushToUser(post.authorid, "New Like 👍", `${currentUserDoc?.username} liked your post!`);
     }
   }
 
@@ -1025,6 +1028,7 @@ window.submitComment = async function (postId) {
         .eq("id", postId);
       if (post.authorid !== currentUser.id) {
         pushNotification(post.authorid, `${currentUserDoc?.username} commented on your post.`, postId);
+        sendPushToUser(post.authorid, "New Comment 💬", `${currentUserDoc?.username} commented on your post.`);
       }
     }
 
@@ -1551,6 +1555,7 @@ window.sendDM = async function () {
 
     await supabase.from("dms").update({ lastmsg: message }).eq("id", dmId);
     pushNotification(activeDMUser.id, `New DM from ${currentUserDoc?.username}`);
+    sendPushToUser(activeDMUser.id, "New DM 📩", `${currentUserDoc?.username}: ${message.slice(0, 60)}`);
 
   } catch (err) {
     input.value = message;
@@ -1984,6 +1989,61 @@ function updateThemeIcon(theme) {
   document.documentElement.classList.add(saved);
   updateThemeIcon(saved);
 })();
+
+// ═══════════════════════════════════════════════════════════
+//  WEB PUSH — subscribe device, send via Edge Function
+// ═══════════════════════════════════════════════════════════
+
+const VAPID_PUBLIC_KEY = "BN4ZD0qVkYRGfBtd8Q_XfaOEQMZCXuoGJoAurglpPf9AqfVaEx2heaAzbNY_CeOOJgdGRheVyogE7mLXsBtFtbA";
+
+async function registerPushSubscription() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (!currentUser) return;
+
+  try {
+    const reg  = await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return;
+
+    // Check if already subscribed
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const json = sub.toJSON();
+    // Store in Supabase — upsert so re-subscribing on same device doesn't duplicate
+    await supabase.from("push_subscriptions").upsert({
+      userid:   currentUser.id,
+      endpoint: json.endpoint,
+      p256dh:   json.keys.p256dh,
+      auth:     json.keys.auth,
+    }, { onConflict: "endpoint" });
+
+  } catch (err) {
+    console.warn("Push subscription failed:", err.message);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw     = window.atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+/** Send a push notification to a user via the Edge Function */
+async function sendPushToUser(recipientUid, title, body, url = "/") {
+  if (!recipientUid || recipientUid === currentUser?.id) return;
+  try {
+    await supabase.functions.invoke("send-push", {
+      body: { userid: recipientUid, title, body, url },
+    });
+  } catch (_) { /* non-critical — in-app notification already sent */ }
+}
 
 // ═══════════════════════════════════════════════════════════
 //  PWA INSTALL PROMPT
