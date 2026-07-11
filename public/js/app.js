@@ -4,9 +4,14 @@
 //  Migrated from Firebase → Supabase
 // ═══════════════════════════════════════════════════════════
 
-import { supabase, getCurrentUser, onAuthChange } from "./supabase-config.js";
-window.supabase = supabase; // expose for features.js
-window.onAuthChange = onAuthChange; // expose for features.js
+// ═══════════════════════════════════════════════════════════
+//  app.js  — DLS Hub Main Application (Supabase Edition)
+// ═══════════════════════════════════════════════════════════
+
+// Wait for supabase-config.js to set up the client
+const supabase     = window._supabaseClient;
+const onAuthChange = window.onAuthChange;
+window.supabase    = supabase;
 
 // ── Global state ──────────────────────────────────────────
 let currentUser   = null;   // Supabase auth user
@@ -1763,6 +1768,8 @@ function updateNotifBadge(count) {
     badge.classList.add("hidden");
   }
 }
+
+function renderNotifications(listEl) {
   if (!notifications.length) {
     listEl.innerHTML = `<p class="p-4 text-center text-mist text-sm">No notifications yet</p>`;
     return;
