@@ -333,6 +333,10 @@ window.adminBanUser = async function(uid) {
   if (!await window.showConfirm('Ban this user? They will be signed out and unable to post, comment, or chat.')) return;
   var { error } = await window.supabase.from('users').update({ banned: true }).eq('uid', uid);
   if (error) { window.showToast('Failed to ban', 'error'); return; }
+  // Kick them out immediately (don't wait for their next login attempt)
+  if (window.broadcastBanEvent) window.broadcastBanEvent(uid);
+  // Refresh the visible Managers count right away
+  if (window.loadHomeStats) window.loadHomeStats();
   window.showToast('User banned'); initAdmin();
 };
 
@@ -340,6 +344,7 @@ window.adminUnbanUser = async function(uid) {
   if (!isAdmin()) return;
   var { error } = await window.supabase.from('users').update({ banned: false }).eq('uid', uid);
   if (error) { window.showToast('Failed to unban', 'error'); return; }
+  if (window.loadHomeStats) window.loadHomeStats();
   window.showToast('User unbanned'); initAdmin();
 };
 
@@ -358,6 +363,9 @@ window.adminRemoveUser = async function(uid, username) {
     await window.supabase.from('chat_messages').delete().eq('authorid', uid);
     await window.supabase.from('dm_messages').delete().eq('senderid', uid);
     await window.supabase.from('users').update({ banned: true }).eq('uid', uid);
+    // Kick them out immediately and refresh the count
+    if (window.broadcastBanEvent) window.broadcastBanEvent(uid);
+    if (window.loadHomeStats) window.loadHomeStats();
     window.showToast('User removed and banned');
     initAdmin();
   } catch (err) {

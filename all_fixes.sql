@@ -108,7 +108,16 @@ create policy "Only admins can view reports" on reports for select
 create policy "Only admins can delete reports" on reports for delete
   using (is_admin_user(auth.uid()::text));
 
--- 4. Reply-to-message support (chat + DMs)
+-- 6. FIX: public_profiles view included banned users, so the home page
+--    "Managers" count, leaderboard, and DM search all still showed/counted
+--    banned accounts. Excluding them makes the count actually drop on ban.
+create or replace view public_profiles
+with (security_invoker = true) as
+  select uid, username, avatar, team, postcount, joinedat
+  from users
+  where not coalesce(banned, false);
+
+-- 7. Reply-to-message support (chat + DMs)
 alter table chat_messages add column if not exists replytoid uuid;
 alter table chat_messages add column if not exists replytoauthor text;
 alter table chat_messages add column if not exists replytotext text;

@@ -209,6 +209,7 @@ onAuthChange(async (user) => {
     loadHomeStats();
     startNotifications();
     startChatBroadcast();
+    startAccountStatusListener();
     // Ask for push permission and register subscription
     setTimeout(registerPushSubscription, 2000); // slight delay so login flow completes first
   } else {
@@ -222,6 +223,7 @@ onAuthChange(async (user) => {
 
     stopNotifications();
     stopChatBroadcast();
+    stopAccountStatusListener();
     if (window.cleanupPresence) window.cleanupPresence();
 
     // Reset home page to guest state
@@ -1153,6 +1155,45 @@ function stopChatBroadcast() {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  ACCOUNT STATUS BROADCAST — force-signout the instant an admin
+//  bans/removes a user, instead of waiting until their next login.
+// ═══════════════════════════════════════════════════════════
+
+let accountStatusChannel = null;
+
+function startAccountStatusListener() {
+  if (accountStatusChannel) return;
+  accountStatusChannel = supabase.channel("account-status");
+
+  accountStatusChannel
+    .on("broadcast", { event: "banned" }, (payload) => {
+      if (payload.payload?.uid !== currentUser?.id) return;
+      showToast("Your account has been suspended.", "error");
+      supabase.auth.signOut();
+    })
+    .subscribe();
+}
+
+function stopAccountStatusListener() {
+  if (accountStatusChannel) {
+    supabase.removeChannel(accountStatusChannel);
+    accountStatusChannel = null;
+  }
+}
+
+/** Broadcast a ban event so the target user's active session is kicked
+ *  out immediately, everywhere they're logged in, without waiting for
+ *  their next login attempt. */
+window.broadcastBanEvent = async function(uid) {
+  try {
+    const ch = supabase.channel("account-status");
+    await ch.subscribe();
+    await ch.send({ type: "broadcast", event: "banned", payload: { uid } });
+    setTimeout(() => supabase.removeChannel(ch), 1000);
+  } catch (_) { /* non-critical — they'll still be blocked on next login */ }
+};
+
+// ═══════════════════════════════════════════════════════════
 //  GLOBAL CHAT
 // ═══════════════════════════════════════════════════════════
 
@@ -1816,6 +1857,7 @@ async function loadHomeStats() {
     document.getElementById("stat-msgs").textContent  = fmt(msgsRes.count || 0);
   } catch (_) { /* stats are non-critical */ }
 }
+window.loadHomeStats = loadHomeStats; // expose for features.js admin ban/remove actions
 
 // ═══════════════════════════════════════════════════════════
 //  NOTIFICATIONS (persisted in Supabase "notifications" table,
