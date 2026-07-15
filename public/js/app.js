@@ -728,7 +728,7 @@ function buildPostCard(postId, p, isProfile = false) {
   return `
     <div class="post-card" id="post-${postId}">
       <div class="flex items-start gap-3 mb-3">
-        <img src="${avatarSrc}" class="w-9 h-9 rounded-full object-cover shrink-0" />
+        <img src="${escAttr(avatarSrc)}" class="w-9 h-9 rounded-full object-cover shrink-0" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between">
             <span class="font-medium text-ice text-sm">${escHtml(p.authorname)}</span>
@@ -1003,7 +1003,7 @@ async function loadComments(postId) {
       el.className = "comment-item";
       el.id = `comment-${c.id}`;
       el.innerHTML = `
-        <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+        <img src="${escAttr(avSrc)}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
         <div class="flex-1">
           <div class="flex items-center justify-between">
             <div>
@@ -1248,7 +1248,7 @@ function appendChatMessage(container, m) {
   const preview = (m.content || "").slice(0, 80);
 
   wrapper.innerHTML = `
-    <img src="${avatarSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+    <img src="${escAttr(avatarSrc)}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
     <div class="max-w-xs">
       ${!isMine ? `<button data-action="dm-user" data-user-id="${escAttr(m.authorid)}" data-user-name="${escAttr(m.authorname)}" class="text-xs text-mist mb-1 hover:text-lime transition text-left">${escHtml(m.authorname)}</button>` : ""}
       <div class="${isMine ? "bubble-me" : "bubble-other"}">
@@ -1583,7 +1583,7 @@ window.openDMById = async function (dmId, otherId, otherName, otherAvatar) {
       el.id = `dm-msg-${m.id}`;
       el.className = `flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`;
       el.innerHTML = `
-        <img src="${avSrc}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
+        <img src="${escAttr(avSrc)}" class="w-7 h-7 rounded-full shrink-0 object-cover" />
         <div>
           <div class="${isMine ? "bubble-me" : "bubble-other"}">${dmReplyBlock}${escHtml(m.content).replace(/@(\w+)/g, '<span class="text-blue-400 font-semibold">@$1</span>')}</div>
           <div class="flex items-center gap-2 mt-1 ${isMine ? "justify-end" : ""}">
@@ -1743,7 +1743,7 @@ async function initLeaderboard(type = "posts") {
           <td class="py-4 px-6">
             <div class="flex items-center gap-3">
               <div class="relative shrink-0">
-                <img src="${avatarSrc}" class="w-8 h-8 rounded-full object-cover" />
+                <img src="${escAttr(avatarSrc)}" class="w-8 h-8 rounded-full object-cover" />
                 <span class="lb-online-dot hidden absolute bottom-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-pitch" data-uid="${escAttr(u.uid)}"></span>
               </div>
               <span class="text-ice font-medium">${escHtml(u.username)}${isMe ? ' <span class="text-lime text-xs">(you)</span>' : ""}</span>

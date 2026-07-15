@@ -158,9 +158,13 @@ function renderReactions(container, postId, reactions) {
     var users = (reactions && reactions[emoji]) || []; var count = users.length;
     var active = window.currentUser && users.includes(window.currentUser.id);
     var cls = active ? 'bg-lime/20 text-lime border border-lime/40' : 'bg-turf border border-line text-mist hover:border-lime/30';
-    return '<button onclick="toggleReaction(\'' + postId + '\',\'' + emoji + '\')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition ' + cls + '"><span>' + emoji + '</span>' + (count ? '<span>' + count + '</span>' : '') + '</button>';
+    return '<button data-action="toggle-reaction" data-post-id="' + window.escAttr(postId) + '" data-emoji="' + window.escAttr(emoji) + '" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition ' + cls + '"><span>' + emoji + '</span>' + (count ? '<span>' + count + '</span>' : '') + '</button>';
   }).join('');
 }
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="toggle-reaction"]');
+  if (btn) window.toggleReaction(btn.dataset.postId, btn.dataset.emoji);
+});
 
 // ═══ REPORT ═══
 window.reportContent = async function(type, id) {
@@ -241,8 +245,10 @@ async function initAdmin() {
     var rl = document.getElementById('admin-reports');
     if (rl) {
       var reports = r4.data || [];
+      // SECURITY: report_id/content_id/content_type/reason are all rendered
+      // as escAttr() data-* values, never concatenated into onclick JS strings.
       rl.innerHTML = reports.length ? reports.map(function(r) {
-        return '<div class="flex items-center justify-between py-3 border-b border-line"><div><p class="text-ice text-sm">' + window.escHtml(r.reason) + ' on ' + window.escHtml(r.content_type) + '</p><p class="text-mist text-xs">' + window.escHtml(r.content_id) + ' · ' + window.timeAgo(new Date(r.created_at)) + '</p></div><button onclick="dismissReport(\'' + r.id + '\')" class="text-mist text-xs hover:text-coral">Dismiss</button></div>';
+        return '<div class="flex items-center justify-between py-3 border-b border-line"><div><p class="text-ice text-sm">' + window.escHtml(r.reason) + ' on ' + window.escHtml(r.content_type) + '</p><p class="text-mist text-xs">' + window.escHtml(r.content_id) + ' · ' + window.timeAgo(new Date(r.created_at)) + '</p></div><button data-action="dismiss-report" data-report-id="' + window.escAttr(r.id) + '" class="text-mist text-xs hover:text-coral">Dismiss</button></div>';
       }).join('') : '<p class="text-mist text-sm">No reports.</p>';
     }
 
@@ -252,7 +258,7 @@ async function initAdmin() {
       var pr = await window.supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
       var posts = pr.data || [];
       pl.innerHTML = posts.length ? posts.map(function(p) {
-        return '<div class="flex items-start justify-between gap-3 py-2 border-b border-line"><div class="min-w-0"><p class="text-lime text-xs font-medium">' + window.escHtml(p.authorname) + '</p><p class="text-ice text-sm break-words">' + window.escHtml(p.content || '') + '</p></div><button onclick="adminDeletePost(\'' + p.id + '\')" class="text-coral text-xs hover:text-white shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>';
+        return '<div class="flex items-start justify-between gap-3 py-2 border-b border-line"><div class="min-w-0"><p class="text-lime text-xs font-medium">' + window.escHtml(p.authorname) + '</p><p class="text-ice text-sm break-words">' + window.escHtml(p.content || '') + '</p></div><button data-action="admin-delete-post" data-post-id="' + window.escAttr(p.id) + '" class="text-coral text-xs hover:text-white shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>';
       }).join('') : '<p class="text-mist text-sm">No posts.</p>';
     }
 
@@ -262,11 +268,14 @@ async function initAdmin() {
       var mr = await window.supabase.from('chat_messages').select('*').order('created_at', { ascending: false }).limit(50);
       var msgs = mr.data || [];
       ml.innerHTML = msgs.length ? msgs.map(function(m) {
-        return '<div class="flex items-start justify-between gap-3 py-2 border-b border-line"><div class="min-w-0"><p class="text-lime text-xs font-medium">' + window.escHtml(m.authorname) + '</p><p class="text-ice text-sm break-words">' + window.escHtml(m.content || '') + '</p></div><button onclick="adminDeleteChatMessage(\'' + m.id + '\')" class="text-coral text-xs hover:text-white shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>';
+        return '<div class="flex items-start justify-between gap-3 py-2 border-b border-line"><div class="min-w-0"><p class="text-lime text-xs font-medium">' + window.escHtml(m.authorname) + '</p><p class="text-ice text-sm break-words">' + window.escHtml(m.content || '') + '</p></div><button data-action="admin-delete-chat" data-msg-id="' + window.escAttr(m.id) + '" class="text-coral text-xs hover:text-white shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div>';
       }).join('') : '<p class="text-mist text-sm">No messages.</p>';
     }
 
-    // Users: ban/unban and remove (wipes their content; see notes on hard account deletion)
+    // Users: ban/unban and remove — username/uid go through data-* attrs only,
+    // NEVER concatenated into an onclick="..." string (that was the XSS hole:
+    // a malicious username could break out of the attribute and execute as JS
+    // the moment an admin viewed this panel).
     var ul = document.getElementById('admin-users');
     if (ul) {
       var ur = await window.supabase.from('users').select('uid, username, email, banned, is_admin').order('joinedat', { ascending: false }).limit(100);
@@ -275,9 +284,9 @@ async function initAdmin() {
         var meTag = u.is_admin ? ' <span class="text-lime text-xs">(admin)</span>' : '';
         var bannedTag = u.banned ? ' <span class="text-coral text-xs">(banned)</span>' : '';
         var banBtn = u.is_admin ? '' : (u.banned
-          ? '<button onclick="adminUnbanUser(\'' + u.uid + '\')" class="text-lime text-xs hover:underline mr-3">Unban</button>'
-          : '<button onclick="adminBanUser(\'' + u.uid + '\')" class="text-mist text-xs hover:text-coral mr-3">Ban</button>');
-        var removeBtn = u.is_admin ? '' : '<button onclick="adminRemoveUser(\'' + u.uid + '\',\'' + window.escHtml(u.username) + '\')" class="text-coral text-xs hover:text-white">Remove</button>';
+          ? '<button data-action="admin-unban" data-uid="' + window.escAttr(u.uid) + '" class="text-lime text-xs hover:underline mr-3">Unban</button>'
+          : '<button data-action="admin-ban" data-uid="' + window.escAttr(u.uid) + '" class="text-mist text-xs hover:text-coral mr-3">Ban</button>');
+        var removeBtn = u.is_admin ? '' : '<button data-action="admin-remove" data-uid="' + window.escAttr(u.uid) + '" data-username="' + window.escAttr(u.username) + '" class="text-coral text-xs hover:text-white">Remove</button>';
         return '<div class="flex items-center justify-between py-2.5 border-b border-line"><div class="min-w-0"><p class="text-ice text-sm">' + window.escHtml(u.username) + meTag + bannedTag + '</p><p class="text-mist text-xs truncate">' + window.escHtml(u.email || '') + '</p></div><div class="shrink-0">' + banBtn + removeBtn + '</div></div>';
       }).join('') : '<p class="text-mist text-sm">No users.</p>';
     }
@@ -285,6 +294,22 @@ async function initAdmin() {
     lucide.createIcons();
   } catch (err) { console.error('ADMIN LOAD ERROR:', err); }
 }
+
+// Single delegated click listener for the whole admin panel — reads
+// data-action + data-* values (never re-parsed as JS, unlike onclick
+// string concatenation) and dispatches to the right handler.
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action]');
+  if (!btn || !document.getElementById('admin-content')?.contains(btn)) return;
+  var action = btn.dataset.action;
+  if (action === 'dismiss-report')     window.dismissReport(btn.dataset.reportId);
+  if (action === 'admin-delete-post')  window.adminDeletePost(btn.dataset.postId);
+  if (action === 'admin-delete-chat')  window.adminDeleteChatMessage(btn.dataset.msgId);
+  if (action === 'admin-ban')          window.adminBanUser(btn.dataset.uid);
+  if (action === 'admin-unban')        window.adminUnbanUser(btn.dataset.uid);
+  if (action === 'admin-remove')       window.adminRemoveUser(btn.dataset.uid, btn.dataset.username);
+});
+
 window.dismissReport = async function(id) { await window.supabase.from('reports').delete().eq('id', id); window.showToast('Dismissed'); initAdmin(); };
 
 window.adminDeletePost = async function(id) {
