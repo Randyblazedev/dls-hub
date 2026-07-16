@@ -596,25 +596,35 @@ function acceptChall(id) {
 async function deleteChall(id) {
   const c = challs.find(x => x.id === id);
   if (!c || c.status !== 'pending') return;
-  const confirm = await styledPrompt('Delete Challenge', 'Are you sure? This cannot be undone.', 'type DELETE to confirm');
+  // Only creator can delete
+  const who = await styledPrompt('Verify', 'Enter your name to confirm you created this challenge:');
+  if (!who || !who.trim()) return;
+  if (c.createdBy && c.createdBy.toLowerCase() !== who.trim().toLowerCase()) {
+    await styledAlert('Only the creator can delete this challenge!');
+    return;
+  }
+  const confirm = await styledPrompt('Delete Challenge', 'Are you sure? Type DELETE to confirm.', 'type DELETE');
   if (confirm !== 'DELETE') { await styledAlert('Cancelled.'); return; }
   
-  // Delete from local array
   challs = challs.filter(x => x.id !== id);
   try { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); } catch {}
-  
-  // Delete from Supabase
   if (window._supabaseClient) {
     try { await window._supabaseClient.from('challenges').delete().eq('id', id); } catch {}
   }
-  
   renderChalls();
 }
 
 async function cancelChall(id) {
   const c = challs.find(x => x.id === id);
   if (!c || c.status !== 'playing') return;
-  const confirm = await styledPrompt('Cancel Challenge', 'Cancel this match? The challenge will go back to pending.', 'type CANCEL to confirm');
+  // Only accepter can cancel
+  const who = await styledPrompt('Verify', 'Enter your name to confirm you accepted this challenge:');
+  if (!who || !who.trim()) return;
+  if (c.acceptedBy && c.acceptedBy.toLowerCase() !== who.trim().toLowerCase()) {
+    await styledAlert('Only the player who accepted can cancel!');
+    return;
+  }
+  const confirm = await styledPrompt('Cancel Challenge', 'Cancel this match?', 'type CANCEL');
   if (confirm !== 'CANCEL') { await styledAlert('Cancelled.'); return; }
   c.status = 'pending';
   c.team2 = 'TBD';
