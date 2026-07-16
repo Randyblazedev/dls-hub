@@ -520,9 +520,14 @@ async function renderChalls() {
     const labels = { pending:'🔓 Pending', playing:'⏳ Playing', submitted:'📸 Submitted', done:'✅ Done' };
     const colors = { pending:'lime', playing:'yellow-400', submitted:'blue-400', done:'purple-400' };
     let act = '';
-    if (c.status === 'pending') act = `<button class="btn-lime text-xs px-3 py-1" onclick="acceptChall('${c.id}')">Accept</button>`;
-    else if (c.status === 'playing') act = `<button class="btn-ghost text-xs px-3 py-1" onclick="openChSS('${c.id}')">📸 Submit Result</button>`;
-    else if (c.status === 'submitted') act = `<button class="btn-lime text-xs px-3 py-1" onclick="confirmChall('${c.id}')">✅ Confirm</button>`;
+    if (c.status === 'pending') {
+      act = `<button class="btn-lime text-xs px-3 py-1" onclick="acceptChall('${c.id}')">Accept</button>`;
+      act += `<button class="btn-ghost text-xs px-3 py-1 ml-1" onclick="deleteChall('${c.id}')" style="color:#ef4444;border-color:#ef4444">✕</button>`;
+    }
+    else if (c.status === 'playing') {
+      act = `<button class="btn-ghost text-xs px-3 py-1" onclick="openChSS('${c.id}')">📸 Submit</button>`;
+      act += `<button class="btn-ghost text-xs px-3 py-1 ml-1" onclick="cancelChall('${c.id}')" style="color:#ef4444;border-color:#ef4444;font-size:.65rem">Cancel</button>`;
+    }
     return `<div class="bg-turf border border-line rounded-xl p-4 mb-2 hover:border-lime/20 transition">
       <div class="flex items-center justify-between gap-3">
         <div class="font-bold text-ice text-sm">${c.team1} <span class="text-mist font-normal">vs</span> ${c.team2}</div>
@@ -586,6 +591,27 @@ function acceptChall(id) {
   c.gameCode = gameCode.trim().toUpperCase();
   saveChalls(); renderChalls();
   sendNotif('⚔️ Challenge Accepted', acceptor + ' accepted! Game code: ' + c.gameCode, 'chall-accept-' + c.id);
+}
+
+async function deleteChall(id) {
+  const c = challs.find(x => x.id === id);
+  if (!c || c.status !== 'pending') return;
+  const confirm = await styledPrompt('Delete Challenge', 'Are you sure? This cannot be undone.', 'type DELETE to confirm');
+  if (confirm !== 'DELETE') { await styledAlert('Cancelled. Type DELETE to confirm.'); return; }
+  challs = challs.filter(x => x.id !== id);
+  saveChalls(); renderChalls();
+}
+
+async function cancelChall(id) {
+  const c = challs.find(x => x.id === id);
+  if (!c || c.status !== 'playing') return;
+  const confirm = await styledPrompt('Cancel Challenge', 'Cancel this match? The challenge will go back to pending.', 'type CANCEL to confirm');
+  if (confirm !== 'CANCEL') { await styledAlert('Cancelled.'); return; }
+  c.status = 'pending';
+  c.team2 = 'TBD';
+  c.acceptedBy = null;
+  c.gameCode = null;
+  saveChalls(); renderChalls();
 }
 
 // ═══════════════════════════════════════════════════════════
