@@ -621,6 +621,9 @@ async function cancelChall(id) {
   c.acceptedBy = null;
   c.gameCode = null;
   saveChalls(); renderChalls();
+  if (window._supabaseClient) {
+    try { await window._supabaseClient.from('challenges').update({ status: 'pending', team2: 'TBD', accepted_by: null, game_code: null }).eq('id', id); } catch {}
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
