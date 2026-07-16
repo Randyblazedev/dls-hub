@@ -401,3 +401,118 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════
+//  ⚔️ Challenges System
+// ═══════════════════════════════════════════════════════════
+
+const CHALL_KEY = 'dlshub_challenges';
+let challs = [];
+let challSSData = null;
+let challActiveId = null;
+
+function loadChalls() {
+  try { challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || []; } catch { challs = []; }
+  if (!challs.length) {
+    challs = [
+      { id:'c1', myTeam:'FC Blaze', opponent:'Player2', oppTeam:'Thunder FC', bet:1000, rules:'5 min match', status:'open', created:Date.now()-3600000, winner:null },
+      { id:'c2', myTeam:'Strikers', opponent:'MessiFan', oppTeam:'Messi FC', bet:2000, rules:'', status:'ongoing', created:Date.now()-7200000, winner:null },
+      { id:'c3', myTeam:'FC Blaze', opponent:'Legend99', oppTeam:'Legends', bet:1500, rules:'Normal', status:'completed', created:Date.now()-86400000*2, winner:'FC Blaze' },
+    ];
+    saveChalls();
+  }
+  renderChalls();
+}
+function saveChalls() { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); }
+
+function renderChalls() {
+  const list = document.getElementById('chall-list');
+  if (!list) return;
+  const sorted = [...challs].sort((a,b) => b.created - a.created);
+  document.getElementById('chall-active').textContent = challs.filter(c => c.status==='open'||c.status==='ongoing').length;
+  document.getElementById('chall-completed').textContent = challs.filter(c => c.status==='completed').length;
+  document.getElementById('chall-total').textContent = challs.reduce((s,c) => s+c.bet, 0).toLocaleString();
+  if (!sorted.length) { list.innerHTML = '<div class="text-center py-12 text-mist"><p class="text-3xl mb-2">⚔️</p><p>No challenges yet</p></div>'; return; }
+  list.innerHTML = sorted.map(c => {
+    const ago = Math.floor((Date.now()-c.created)/3600000);
+    const timeStr = ago < 1 ? 'Just now' : ago < 24 ? ago+'h ago' : Math.floor(ago/24)+'d ago';
+    const labels = { open:'🔓 Open', ongoing:'⏳ Playing', completed:'✅ Done' };
+    let act = '';
+    if (c.status === 'open') act = `<button class="btn-lime text-xs px-3 py-1" onclick="acceptChall('${c.id}')">Accept</button>`;
+    else if (c.status === 'ongoing') act = `<button class="btn-ghost text-xs px-3 py-1" onclick="openChSS('${c.id}')">📸 Submit</button>`;
+    return `<div class="bg-turf border border-line rounded-xl p-4 mb-2 hover:border-lime/20 transition">
+      <div class="flex items-center justify-between gap-3"><div class="font-bold text-ice text-sm">${c.myTeam} <span class="text-mist font-normal">vs</span> ${c.oppTeam}</div><div class="text-gold font-extrabold text-sm">🪙 ${c.bet.toLocaleString()}</div></div>
+      <div class="flex items-center gap-3 mt-2 text-xs text-mist flex-wrap"><span class="text-${c.status==='open'?'lime':c.status==='ongoing'?'yellow-400':'purple-400'} font-semibold">${labels[c.status]}</span><span>👤 ${c.opponent}</span><span>🕐 ${timeStr}</span>${c.winner?'<span>🏆 '+c.winner+'</span>':''}<span class="flex-1"></span>${act}</div>
+    </div>`;
+  }).join('');
+}
+
+function openChallengeModal() {
+  document.getElementById('chall-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeChallengeModal() {
+  document.getElementById('chall-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function createChallenge() {
+  const myTeam = document.getElementById('ch-myteam').value.trim();
+  const opponent = document.getElementById('ch-opponent').value.trim();
+  const oppTeam = document.getElementById('ch-oppteam').value.trim();
+  const bet = parseInt(document.getElementById('ch-bet').value);
+  const rules = document.getElementById('ch-rules').value.trim();
+  if (!myTeam || !opponent || !bet || bet < 100) { alert('Fill all fields. Min bet: 100'); return; }
+  challs.push({ id:'ch-'+Date.now().toString(36), myTeam, opponent, oppTeam: oppTeam||opponent+"'s team", bet, rules, status:'open', created:Date.now(), winner:null });
+  saveChalls(); closeChallengeModal(); renderChalls();
+  document.getElementById('ch-myteam').value=''; document.getElementById('ch-opponent').value='';
+  document.getElementById('ch-oppteam').value=''; document.getElementById('ch-bet').value='500'; document.getElementById('ch-rules').value='';
+}
+
+function acceptChall(id) {
+  const c = challs.find(x => x.id === id);
+  if (!c) return;
+  const yourTeam = prompt('Enter YOUR exact DLS team name:');
+  if (!yourTeam || !yourTeam.trim()) return;
+  // When accepting, swap perspective so the accepter plays as their team
+  c.status = 'ongoing';
+  saveChalls(); renderChalls();
+}
+
+function openChSS(id) {
+  challActiveId = id;
+  challSSData = null;
+  document.getElementById('ch-ss-preview').style.display = 'none';
+  document.getElementById('ch-ss-input').value = '';
+  document.getElementById('chall-ss-modal').classList.remove('hidden');
+}
+function closeSSModal() {
+  document.getElementById('chall-ss-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function previewChSS(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { challSSData = ev.target.result; document.getElementById('ch-ss-img').src = challSSData; document.getElementById('ch-ss-preview').style.display = 'block'; };
+  r.readAsDataURL(f);
+}
+function submitChResult() {
+  if (!challActiveId || !challSSData) { alert('Upload a screenshot first!'); return; }
+  const c = challs.find(x => x.id === challActiveId);
+  if (!c) return;
+  const winner = prompt('Enter the exact WINNING team name from the result screen:');
+  if (!winner || !winner.trim()) return;
+  c.status = 'completed';
+  c.winner = winner.trim();
+  c.completedAt = Date.now();
+  saveChalls(); closeSSModal(); renderChalls();
+}
+
+// Initialize challenges when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  // Check if challenges page exists before trying to load
+  if (document.getElementById('chall-list')) {
+    loadChalls();
+  }
+});

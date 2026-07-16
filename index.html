@@ -73,7 +73,8 @@
         <button onclick="navigate('feed')"          class="nav-link hover:text-ice transition">Feed</button>
         <button onclick="navigate('chat')"          class="nav-link hover:text-ice transition">Community Chat</button>
         <button onclick="navigate('dm')"            class="nav-link hover:text-ice transition">Messages</button>
-        <button onclick="navigate('leaderboards')"  class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('challenges')" class="nav-link hover:text-ice transition text-yellow-400">⚔️ Challenges</button>
       </div>
 
       <!-- Right side controls — always in a flex row so install button can't break layout -->
@@ -136,7 +137,8 @@
         <button onclick="navigate('feed');toggleMobileMenu()"         class="text-left hover:text-ice">Feed</button>
         <button onclick="navigate('chat');toggleMobileMenu()"         class="text-left hover:text-ice">Community Chat</button>
         <button onclick="navigate('dm');toggleMobileMenu()"           class="text-left hover:text-ice">Messages</button>
-        <button onclick="navigate('leaderboards');toggleMobileMenu()" class="text-left hover:text-ice">Leaderboards</button>
+        <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('challenges')" class="nav-link hover:text-ice transition text-yellow-400">⚔️ Challenges</button>
         <button onclick="navigate('admin');toggleMobileMenu()"        class="text-left hover:text-ice">Admin</button>
         <button onclick="navigate('profile');toggleMobileMenu()"      class="text-left hover:text-ice">My Profile</button>
         <button onclick="handleSignOut()"                              class="text-left text-coral">Sign Out</button>
@@ -177,12 +179,14 @@
           <!-- Logged OUT: show Join + Leaderboards -->
           <div id="home-guest-btns" class="flex flex-col sm:flex-row gap-4 justify-center">
             <button onclick="navigate('signup')" class="btn-lime text-base px-8 py-3">Join the Hub</button>
-            <button onclick="navigate('leaderboards')" class="btn-ghost text-base px-8 py-3">View Leaderboards</button>
+            <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('challenges')" class="nav-link hover:text-ice transition text-yellow-400">⚔️ Challenges</button>
           </div>
           <!-- Logged IN: show Go to Feed -->
           <div id="home-auth-btns" class="hidden flex flex-col sm:flex-row gap-4 justify-center">
             <button onclick="navigate('feed')" class="btn-lime text-base px-8 py-3">Go to Feed</button>
-            <button onclick="navigate('leaderboards')" class="btn-ghost text-base px-8 py-3">View Leaderboards</button>
+            <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('challenges')" class="nav-link hover:text-ice transition text-yellow-400">⚔️ Challenges</button>
           </div>
         </div>
       </section>
@@ -657,6 +661,57 @@
             <p>For privacy concerns, reach out through the DLS Hub community chat or DM the admin.</p>
           </div>
           <p class="text-mist text-xs">Last updated: June 2026</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⚔️ Challenges Page -->
+    <div id="page-challenges" class="page-view hidden">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="font-display text-2xl font-black text-ice">⚔️ Challenges</h2>
+          <button onclick="openChallengeModal()" class="btn-lime text-sm px-4 py-2">+ New</button>
+        </div>
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="bg-turf border border-line rounded-xl p-4 text-center"><div class="text-xl font-extrabold text-lime" id="chall-active">0</div><div class="text-xs text-mist uppercase tracking-wider font-semibold mt-1">Active</div></div>
+          <div class="bg-turf border border-line rounded-xl p-4 text-center"><div class="text-xl font-extrabold text-lime" id="chall-completed">0</div><div class="text-xs text-mist uppercase tracking-wider font-semibold mt-1">Completed</div></div>
+          <div class="bg-turf border border-line rounded-xl p-4 text-center"><div class="text-xl font-extrabold text-yellow-400" id="chall-total">0</div><div class="text-xs text-mist uppercase tracking-wider font-semibold mt-1">Total Bets</div></div>
+        </div>
+        <div id="chall-list"></div>
+      </div>
+    </div>
+
+    <!-- Challenge Create Modal -->
+    <div id="chall-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick="if(event.target===this)closeChallengeModal()">
+      <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display text-lg font-bold text-ice">⚔️ New Challenge</h3>
+          <button onclick="closeChallengeModal()" class="text-mist hover:text-ice text-xl">✕</button>
+        </div>
+        <div class="space-y-3">
+          <div><label class="text-xs text-mist font-semibold uppercase tracking-wider">Your Team Name</label><input type="text" id="ch-myteam" placeholder="FC Blaze" class="w-full mt-1 px-3 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none focus:border-lime"></div>
+          <div><label class="text-xs text-mist font-semibold uppercase tracking-wider">Opponent Username</label><input type="text" id="ch-opponent" placeholder="Player2" class="w-full mt-1 px-3 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none focus:border-lime"></div>
+          <div><label class="text-xs text-mist font-semibold uppercase tracking-wider">Opponent Team Name</label><input type="text" id="ch-oppteam" placeholder="Thunder FC" class="w-full mt-1 px-3 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none focus:border-lime"></div>
+          <div><label class="text-xs text-mist font-semibold uppercase tracking-wider">Bet Amount</label><input type="number" id="ch-bet" value="500" class="w-full mt-1 px-3 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none focus:border-lime"></div>
+          <div><label class="text-xs text-mist font-semibold uppercase tracking-wider">Rules</label><textarea id="ch-rules" rows="2" class="w-full mt-1 px-3 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none focus:border-lime" placeholder="e.g. 5 min match"></textarea></div>
+          <button onclick="createChallenge()" class="btn-lime w-full py-3 text-sm">⚔️ Issue Challenge</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Challenge Screenshot Modal -->
+    <div id="chall-ss-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick="if(event.target===this)closeSSModal()">
+      <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+        <h3 class="font-display text-lg font-bold text-ice mb-4">📸 Submit Result</h3>
+        <div onclick="document.getElementById('ch-ss-input').click()" class="border-2 border-dashed border-line rounded-xl p-6 text-center cursor-pointer hover:border-lime/40 transition mb-3">
+          <p class="text-3xl mb-2">📸</p>
+          <p class="text-sm text-mist">Screenshot of match result</p>
+        </div>
+        <input type="file" id="ch-ss-input" accept="image/*" class="hidden" onchange="previewChSS(event)">
+        <div id="ch-ss-preview" class="hidden mb-3 text-center"><img id="ch-ss-img" class="max-h-32 rounded-lg border border-line"></div>
+        <div class="flex gap-2">
+          <button onclick="closeSSModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+          <button onclick="submitChResult()" class="btn-lime flex-1 py-2 text-sm">Submit Winner</button>
         </div>
       </div>
     </div>
