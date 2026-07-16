@@ -412,24 +412,44 @@ let challSSData = null;
 let challActiveId = null;
 let challUserPoints = 0;
 
+const CHALL_KEY = 'dlshub_challenges';
+
 async function loadChalls() {
-  // Try Supabase first, fallback to localStorage
+  // Try Supabase first (cross-device), fallback to localStorage
+  let supabaseLoaded = false;
   if (window._supabaseClient) {
     try {
       const { data, error } = await window._supabaseClient
         .from('challenges')
         .select('*')
         .order('created_at', { ascending: false });
-      if (!error && data) challs = data;
-    } catch { /* fallback to localStorage */ }
+      if (!error && data && data.length > 0) {
+        challs = data;
+        supabaseLoaded = true;
+        // Sync to localStorage as backup
+        try { localStorage.setItem(CHALL_KEY, JSON.stringify(data)); } catch {}
+      }
+    } catch { /* fallback */ }
   }
+  
+  if (!supabaseLoaded) {
+    try { challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || []; } catch { challs = []; }
+    // Filter out old demo IDs
+    challs = challs.filter(c => !c.id?.match(/^c\d+$/));
+  }
+  
   renderChalls();
   loadUserPoints();
 }
 
 async function loadUserPoints() {
   const user = window.currentUser;
-  if (!user || !window._supabaseClient) { challUserPoints = 5; return; }
+  if (!user || !window._supabaseClient) { 
+    challUserPoints = 5; 
+    const el = document.getElementById('chall-my-points');
+    if (el) el.textContent = '5';
+    return; 
+  }
   try {
     const { data } = await window._supabaseClient
       .from('users')
@@ -437,12 +457,43 @@ async function loadUserPoints() {
       .eq('username', user.username || user.email)
       .single();
     challUserPoints = data?.points ?? 0;
-    document.getElementById('chall-my-points').textContent = challUserPoints;
-  } catch { challUserPoints = 5; }
+    const el = document.getElementById('chall-my-points');
+    if (el) el.textContent = challUserPoints;
+  } catch { 
+    challUserPoints = 5; 
+    const el = document.getElementById('chall-my-points');
+    if (el) el.textContent = '5';
+  }
 }
 
 async function saveChalls() {
-  // Challenges saved to Supabase automatically via direct inserts
+  // Save to localStorage always
+  try { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); } catch {}
+  
+  // Also save to Supabase if available
+  if (window._supabaseClient) {
+    try {
+      // Upsert each challenge
+      for (const c of challs) {
+        if (c.id && c.id.startsWith('ch-')) {
+          await window._supabaseClient.from('challenges').upsert({
+            id: c.id,
+            team1: c.team1,
+            team2: c.team2,
+            bet: c.bet,
+            rules: c.rules || '',
+            status: c.status,
+            created_by: c.createdBy || 'anonymous',
+            accepted_by: c.acceptedBy || null,
+            winner: c.winner || null,
+            score: c.score || null,
+            verified_by: c.verifiedBy || null,
+            created_at: new Date(c.createdAt || c.created_at || Date.now()).toISOString()
+          }, { onConflict: 'id' });
+        }
+      }
+    } catch (e) { console.log('Supabase save error:', e.message); }
+  }
 }
 
 async function renderChalls() {
