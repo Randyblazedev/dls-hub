@@ -414,8 +414,11 @@ let challSSData = null;
 let challActiveId = null;
 
 function loadChalls() {
-  try { challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || []; } catch { challs = []; }
-  // No demo challenges - users create their own
+  try { 
+    challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || [];
+    // Filter out old demo challenges (ones with hardcoded IDs like c1, c2, c3)
+    challs = challs.filter(c => !c.id.match(/^c\d+$/));
+  } catch { challs = []; }
   renderChalls();
 }
 function saveChalls() { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); }
@@ -468,7 +471,9 @@ function createChallenge() {
   const bet = parseInt(document.getElementById('ch-bet').value);
   const rules = document.getElementById('ch-rules').value.trim();
   if (!t1 || bet < 1 || bet > 5) { alert('Enter your team name. Bet between 1-5 points.'); return; }
-  challs.push({ id:'ch-'+Date.now().toString(36), team1:t1, team2:'TBD', bet, rules, status:'pending', created:Date.now(), winner:null, verifiedBy:null });
+  const creator = prompt('Enter your name/username:');
+  if (!creator || !creator.trim()) return;
+  challs.push({ id:'ch-'+Date.now().toString(36), team1:t1, team2:'TBD', bet, rules, status:'pending', created:Date.now(), winner:null, verifiedBy:null, createdBy: creator.trim() });
   saveChalls(); closeChallengeModal(); renderChalls();
   document.getElementById('ch-myteam').value=''; document.getElementById('ch-bet').value='3'; document.getElementById('ch-rules').value='';
 }
@@ -477,10 +482,18 @@ function createChallenge() {
 function acceptChall(id) {
   const c = challs.find(x => x.id === id);
   if (!c) return;
+  const acceptor = prompt('Enter your name/username:');
+  if (!acceptor || !acceptor.trim()) return;
+  // Can't accept your own challenge
+  if (c.createdBy && c.createdBy.toLowerCase() === acceptor.trim().toLowerCase()) {
+    alert('You cannot accept your own challenge!');
+    return;
+  }
   const theirTeam = prompt('Enter YOUR exact DLS team name:');
   if (!theirTeam || !theirTeam.trim()) return;
   c.status = 'playing';
   c.team2 = theirTeam.trim();
+  c.acceptedBy = acceptor.trim();
   saveChalls(); renderChalls();
 }
 
