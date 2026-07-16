@@ -670,7 +670,10 @@
       <div class="max-w-4xl mx-auto">
         <div class="flex items-center justify-between mb-6">
           <h2 class="font-display text-2xl font-black text-ice">⚔️ Challenges</h2>
-          <button onclick="openChallengeModal()" class="btn-lime text-sm px-4 py-2">+ New</button>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-mist">Your points: <b class="text-yellow-400" id="chall-my-points">0</b></span>
+            <button onclick="openChallengeModal()" class="btn-lime text-sm px-4 py-2">+ New</button>
+          </div>
         </div>
         <div class="grid grid-cols-3 gap-3 mb-6">
           <div class="bg-turf border border-line rounded-xl p-4 text-center"><div class="text-xl font-extrabold text-lime" id="chall-active">0</div><div class="text-xs text-mist uppercase tracking-wider font-semibold mt-1">Active</div></div>

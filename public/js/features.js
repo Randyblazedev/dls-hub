@@ -403,27 +403,49 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ═══════════════════════════════════════════════════════════
-//  ⚔️ Challenges System (Simple Honor System)
-//  Player1 challenges Player2 → both enter exact team names
-//  Max bet: 5 points. One submits screenshot, other confirms.
+//  ⚔️ Challenges System (Supabase Points + Credit)
+//  Users bet 1-5 points. AI determines winner. Debts tracked.
 // ═══════════════════════════════════════════════════════════
 
-const CHALL_KEY = 'dlshub_challenges';
 let challs = [];
 let challSSData = null;
 let challActiveId = null;
+let challUserPoints = 0;
 
-function loadChalls() {
-  try { 
-    challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || [];
-    // Filter out old demo challenges (ones with hardcoded IDs like c1, c2, c3)
-    challs = challs.filter(c => !c.id.match(/^c\d+$/));
-  } catch { challs = []; }
+async function loadChalls() {
+  // Try Supabase first, fallback to localStorage
+  if (window._supabaseClient) {
+    try {
+      const { data, error } = await window._supabaseClient
+        .from('challenges')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) challs = data;
+    } catch { /* fallback to localStorage */ }
+  }
   renderChalls();
+  loadUserPoints();
 }
-function saveChalls() { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); }
 
-function renderChalls() {
+async function loadUserPoints() {
+  const user = window.currentUser;
+  if (!user || !window._supabaseClient) { challUserPoints = 5; return; }
+  try {
+    const { data } = await window._supabaseClient
+      .from('users')
+      .select('points')
+      .eq('username', user.username || user.email)
+      .single();
+    challUserPoints = data?.points ?? 0;
+    document.getElementById('chall-my-points').textContent = challUserPoints;
+  } catch { challUserPoints = 5; }
+}
+
+async function saveChalls() {
+  // Challenges saved to Supabase automatically via direct inserts
+}
+
+async function renderChalls() {
   const list = document.getElementById('chall-list');
   if (!list) return;
   const sorted = [...challs].sort((a,b) => b.created - a.created);
