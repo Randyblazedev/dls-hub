@@ -471,6 +471,7 @@ async function renderChalls() {
         <span class="text-${colors[c.status]} font-semibold">${labels[c.status]||c.status}</span>
         <span>🕐 ${timeStr}</span>
         ${c.winner ? '<span>🏆 '+c.winner+'</span>' : ''}
+        ${c.gameCode ? '<span>🔑 '+c.gameCode+'</span>' : ''}
         ${c.submittedBy ? '<span>📸 by '+c.submittedBy+'</span>' : ''}
         ${c.confirmedBy ? '<span>✅ by '+c.confirmedBy+'</span>' : ''}
         <span class="flex-1"></span>${act}
@@ -506,17 +507,46 @@ function acceptChall(id) {
   if (!c) return;
   const acceptor = prompt('Enter your name/username:');
   if (!acceptor || !acceptor.trim()) return;
-  // Can't accept your own challenge
   if (c.createdBy && c.createdBy.toLowerCase() === acceptor.trim().toLowerCase()) {
     alert('You cannot accept your own challenge!');
     return;
   }
   const theirTeam = prompt('Enter YOUR exact DLS team name:');
   if (!theirTeam || !theirTeam.trim()) return;
+  
+  // Game code: the acceptor creates/enters a match code
+  const gameCode = prompt('Create a game code for this match (share with opponent):', Math.random().toString(36).slice(2,8).toUpperCase());
+  if (!gameCode || !gameCode.trim()) return;
+  
   c.status = 'playing';
   c.team2 = theirTeam.trim();
   c.acceptedBy = acceptor.trim();
+  c.gameCode = gameCode.trim().toUpperCase();
   saveChalls(); renderChalls();
+  
+  // In-app notification
+  showToast('⚔️ Challenge accepted! Game code: ' + c.gameCode);
+  
+  // Try sending push notification if supported
+  notifyChallengeAccepted(c);
+}
+
+// Request notification permission & send push
+async function notifyChallengeAccepted(c) {
+  if (!('Notification' in window)) return;
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    new Notification('⚔️ Challenge Accepted!', {
+      body: c.acceptedBy + ' accepted your challenge! Game code: ' + c.gameCode,
+      icon: '/public/icons/icon-192.png',
+      tag: 'challenge-' + c.id
+    });
+  }
+}
+
+// Request notification permission on first visit
+if ('Notification' in window && Notification.permission === 'default') {
+  setTimeout(() => Notification.requestPermission(), 5000);
 }
 
 // Submit result: one player uploads screenshot + declares winner
