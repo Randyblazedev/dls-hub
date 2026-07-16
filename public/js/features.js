@@ -515,12 +515,53 @@ function previewChSS(e) {
   r.onload = ev => { challSSData = ev.target.result; document.getElementById('ch-ss-img').src = challSSData; document.getElementById('ch-ss-preview').style.display = 'block'; };
   r.readAsDataURL(f);
 }
+
+// AI Vision: analyze screenshot to auto-detect winner
+async function analyzeWithAI() {
+  if (!challSSData) { alert('Upload a screenshot first!'); return; }
+  const btn = document.getElementById('ai-analyze-btn');
+  const resultDiv = document.getElementById('ai-result');
+  btn.disabled = true;
+  btn.textContent = '🤖 Analyzing...';
+  resultDiv.innerHTML = '<p class="text-sm text-yellow-400">AI is reading the result screen...</p>';
+
+  try {
+    const AI_URL = 'https://keith-switching-meaning-calculate.trycloudflare.com/api/vision/analyze';
+    const res = await fetch(AI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: challSSData, prompt: 'Read this DLS match result screen. What is the winner team name, loser team name, and score?' })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      resultDiv.innerHTML = '<p class="text-sm text-red-400">AI could not read the result: ' + data.error + '</p>';
+      btn.disabled = false;
+      btn.textContent = '🤖 AI Verify';
+      return;
+    }
+
+    document.getElementById('ch-ai-winner').value = data.winner || '';
+    document.getElementById('ch-ai-score').value = (data.homeScore || '?') + ' - ' + (data.awayScore || '?');
+    resultDiv.innerHTML = '<p class="text-sm text-green-400">✅ AI detected: <b>' + (data.winner || 'Unknown') + '</b> wins (' + (data.homeScore||'?') + '-' + (data.awayScore||'?') + ')</p>';
+  } catch (e) {
+    resultDiv.innerHTML = '<p class="text-sm text-red-400">AI offline. Enter winner manually.</p>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🤖 AI Verify';
+}
+
 function submitChResult() {
   if (!challActiveId || !challSSData) { alert('Upload a screenshot first!'); return; }
   const c = challs.find(x => x.id === challActiveId);
   if (!c) return;
-  const winner = prompt('Enter the WINNING team name:');
+  
+  // Use AI-detected winner or manual entry
+  const aiWinner = document.getElementById('ch-ai-winner').value.trim();
+  const winner = aiWinner || prompt('Enter the WINNING team name:');
   if (!winner || !winner.trim()) return;
+  
   c.status = 'submitted';
   c.winner = winner.trim();
   c.submittedBy = c.submittedBy || window.currentUser?.username || 'Someone';
