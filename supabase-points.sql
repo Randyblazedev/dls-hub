@@ -3,8 +3,9 @@
 -- Run this SQL in your Supabase SQL Editor (https://supabase.com)
 -- ═══════════════════════════════════════════════════════════
 
--- 1. Add points column to users table (if not exists)
+-- 1. Add columns to users table (if not exists)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS points INTEGER DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 
 -- 2. Challenges table
 CREATE TABLE IF NOT EXISTS challenges (

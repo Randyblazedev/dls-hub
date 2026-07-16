@@ -202,8 +202,18 @@ function initPresence() {
     if (document.getElementById('leaderboard-body')) updateLeaderboardDots();
   });
   featurePresenceChannel.subscribe(function(status) {
-    if (status === 'SUBSCRIBED') featurePresenceChannel.track({ user_id: window.currentUser.id, username: window.currentUserDoc && window.currentUserDoc.username, online_at: new Date().toISOString() });
+    if (status === 'SUBSCRIBED') {
+      featurePresenceChannel.track({ user_id: window.currentUser.id, username: window.currentUserDoc && window.currentUserDoc.username, online_at: new Date().toISOString() });
+      // Update last_seen in users table
+      window.supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('uid', window.currentUser.id).then();
+    }
   });
+  // Also update last_seen periodically while user is active
+  setInterval(function() {
+    if (window.currentUser) {
+      window.supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('uid', window.currentUser.id).then();
+    }
+  }, 60000); // every minute
 }
 
 function updateLeaderboardDots() {
