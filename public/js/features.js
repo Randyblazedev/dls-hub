@@ -597,9 +597,18 @@ async function deleteChall(id) {
   const c = challs.find(x => x.id === id);
   if (!c || c.status !== 'pending') return;
   const confirm = await styledPrompt('Delete Challenge', 'Are you sure? This cannot be undone.', 'type DELETE to confirm');
-  if (confirm !== 'DELETE') { await styledAlert('Cancelled. Type DELETE to confirm.'); return; }
+  if (confirm !== 'DELETE') { await styledAlert('Cancelled.'); return; }
+  
+  // Delete from local array
   challs = challs.filter(x => x.id !== id);
-  saveChalls(); renderChalls();
+  try { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); } catch {}
+  
+  // Delete from Supabase
+  if (window._supabaseClient) {
+    try { await window._supabaseClient.from('challenges').delete().eq('id', id); } catch {}
+  }
+  
+  renderChalls();
 }
 
 async function cancelChall(id) {
