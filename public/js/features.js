@@ -499,6 +499,7 @@ function createChallenge() {
   challs.push({ id:'ch-'+Date.now().toString(36), team1:t1, team2:'TBD', bet, rules, status:'pending', created:Date.now(), winner:null, verifiedBy:null, createdBy: creator.trim() });
   saveChalls(); closeChallengeModal(); renderChalls();
   document.getElementById('ch-myteam').value=''; document.getElementById('ch-bet').value='3'; document.getElementById('ch-rules').value='';
+  sendNotif('⚔️ Challenge Posted', t1 + ' betting ' + bet + ' points — waiting for opponent!', 'chall-create');
 }
 
 // Accept: opponent confirms the challenge
@@ -523,31 +524,101 @@ function acceptChall(id) {
   c.acceptedBy = acceptor.trim();
   c.gameCode = gameCode.trim().toUpperCase();
   saveChalls(); renderChalls();
-  
-  // In-app notification
-  showToast('⚔️ Challenge accepted! Game code: ' + c.gameCode);
-  
-  // Try sending push notification if supported
-  notifyChallengeAccepted(c);
+  sendNotif('⚔️ Challenge Accepted', acceptor + ' accepted! Game code: ' + c.gameCode, 'chall-accept-' + c.id);
 }
 
-// Request notification permission & send push
-async function notifyChallengeAccepted(c) {
-  if (!('Notification' in window)) return;
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    new Notification('⚔️ Challenge Accepted!', {
-      body: c.acceptedBy + ' accepted your challenge! Game code: ' + c.gameCode,
-      icon: '/public/icons/icon-192.png',
-      tag: 'challenge-' + c.id
-    });
+// ═══════════════════════════════════════════════════════════
+//  🔔 Unified Notification System (In-App + Browser Push)
+// ═══════════════════════════════════════════════════════════
+
+let notifCount = 0;
+const NOTIF_KEY = 'dlshub_notif_count';
+
+// Load unread count
+function loadNotifCount() {
+  try { notifCount = parseInt(localStorage.getItem(NOTIF_KEY)) || 0; } catch { notifCount = 0; }
+  updateNotifBadge();
+}
+
+function updateNotifBadge() {
+  // Update the Challenges nav link badge
+  document.querySelectorAll('[onclick*="challenges"]').forEach(el => {
+    const existing = el.querySelector('.notif-badge');
+    if (notifCount > 0) {
+      if (!existing) {
+        const badge = document.createElement('span');
+        badge.className = 'notif-badge';
+        badge.style.cssText = 'background:#22c55e;color:#000;font-size:.6rem;font-weight:800;padding:1px 6px;border-radius:50px;margin-left:4px;vertical-align:middle';
+        badge.textContent = notifCount > 99 ? '99+' : notifCount;
+        el.appendChild(badge);
+      } else {
+        existing.textContent = notifCount > 99 ? '99+' : notifCount;
+      }
+    } else if (existing) {
+      existing.remove();
+    }
+  });
+}
+
+function incrementNotif() {
+  notifCount++;
+  try { localStorage.setItem(NOTIF_KEY, String(notifCount)); } catch {}
+  updateNotifBadge();
+}
+
+function clearNotifs() {
+  notifCount = 0;
+  try { localStorage.setItem(NOTIF_KEY, '0'); } catch {}
+  updateNotifBadge();
+}
+
+// Unified notification sender
+async function sendNotif(title, body, tag) {
+  // In-app toast (styled dark)
+  if (typeof showToast === 'function') {
+    showToast(title + ' — ' + body);
   }
+  
+  // Increment counter
+  incrementNotif();
+  
+  // Browser push notification
+  if (!('Notification' in window)) return;
+  try {
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body: body,
+        icon: '/public/icons/icon-192.png',
+        tag: tag || 'dls-' + Date.now(),
+        badge: '/public/icons/icon-192.png',
+        vibrate: [200, 100, 200]
+      });
+    } else if (Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        new Notification(title, { body, icon: '/public/icons/icon-192.png', tag: tag || 'dls-' + Date.now() });
+      }
+    }
+  } catch (e) { /* notifications not available */ }
 }
 
-// Request notification permission on first visit
+// Request notification permission gently on first visit
 if ('Notification' in window && Notification.permission === 'default') {
-  setTimeout(() => Notification.requestPermission(), 5000);
+  setTimeout(() => {
+    Notification.requestPermission();
+  }, 10000);
 }
+
+// Listen for navigation to clear badge
+const origNavigate = window.navigate;
+if (typeof origNavigate === 'function') {
+  window.navigate = function(page) {
+    if (page === 'challenges') clearNotifs();
+    return origNavigate(page);
+  };
+}
+
+loadNotifCount();
 
 // Submit result: one player uploads screenshot + declares winner
 function openChSS(id) {
@@ -620,7 +691,7 @@ async function submitChResult() {
         saveChalls();
         closeSSModal();
         renderChalls();
-        alert('🏆 ' + c.winner + ' wins! Points assigned.');
+        sendNotif('🏆 Match Complete', c.winner + ' wins!', 'chall-done-' + c.id);
       }
     } else {
       // AI couldn't read it - manual fallback
