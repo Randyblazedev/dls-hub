@@ -423,6 +423,19 @@ async function initProfile() {
   const avatarUrl = avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=0f1f17&color=b5ff47&size=200`;
   document.getElementById("profile-avatar").src   = avatarUrl;
   document.getElementById("profile-username").textContent = username;
+  // Last seen
+  var lastSeenEl = document.getElementById("profile-lastseen");
+  if (lastSeenEl && currentUserDoc.last_seen) {
+    var d = new Date(currentUserDoc.last_seen);
+    var now = new Date();
+    var diffMin = Math.floor((now - d) / 60000);
+    if (diffMin < 2) lastSeenEl.textContent = "🟢 Online now";
+    else if (diffMin < 60) lastSeenEl.textContent = "Last seen " + diffMin + " minutes ago";
+    else if (diffMin < 1440) lastSeenEl.textContent = "Last seen " + Math.floor(diffMin / 60) + " hours ago";
+    else lastSeenEl.textContent = "Last seen " + Math.floor(diffMin / 1440) + " days ago";
+  } else if (lastSeenEl) {
+    lastSeenEl.textContent = "";
+  }
   document.getElementById("profile-email").textContent    = email;
   document.getElementById("profile-team").textContent     = team ? `⚽ ${team}` : "";
 
