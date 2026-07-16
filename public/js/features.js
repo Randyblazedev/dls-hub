@@ -403,7 +403,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ═══════════════════════════════════════════════════════════
-//  ⚔️ Challenges System
+//  ⚔️ Challenges System (Simple Honor System)
+//  Player1 challenges Player2 → both enter exact team names
+//  Max bet: 5 points. One submits screenshot, other confirms.
 // ═══════════════════════════════════════════════════════════
 
 const CHALL_KEY = 'dlshub_challenges';
@@ -414,10 +416,11 @@ let challActiveId = null;
 function loadChalls() {
   try { challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || []; } catch { challs = []; }
   if (!challs.length) {
+    const n = Date.now();
     challs = [
-      { id:'c1', myTeam:'FC Blaze', opponent:'Player2', oppTeam:'Thunder FC', bet:1000, rules:'5 min match', status:'open', created:Date.now()-3600000, winner:null },
-      { id:'c2', myTeam:'Strikers', opponent:'MessiFan', oppTeam:'Messi FC', bet:2000, rules:'', status:'ongoing', created:Date.now()-7200000, winner:null },
-      { id:'c3', myTeam:'FC Blaze', opponent:'Legend99', oppTeam:'Legends', bet:1500, rules:'Normal', status:'completed', created:Date.now()-86400000*2, winner:'FC Blaze' },
+      { id:'c1', team1:'FC Blaze', team2:'Thunder FC', bet:3, by:'Player1', status:'pending', created:n-7200000, winner:null, submittedBy:null, confirmedBy:null },
+      { id:'c2', team1:'Strikers', team2:'Messi FC', bet:5, by:'Player2', status:'playing', created:n-3600000, winner:null, submittedBy:null, confirmedBy:null },
+      { id:'c3', team1:'FC Blaze', team2:'Legends', bet:2, by:'Player1', status:'done', created:n-86400000*3, winner:'FC Blaze', submittedBy:'Player1', confirmedBy:'Player2' },
     ];
     saveChalls();
   }
@@ -429,20 +432,32 @@ function renderChalls() {
   const list = document.getElementById('chall-list');
   if (!list) return;
   const sorted = [...challs].sort((a,b) => b.created - a.created);
-  document.getElementById('chall-active').textContent = challs.filter(c => c.status==='open'||c.status==='ongoing').length;
-  document.getElementById('chall-completed').textContent = challs.filter(c => c.status==='completed').length;
-  document.getElementById('chall-total').textContent = challs.reduce((s,c) => s+c.bet, 0).toLocaleString();
+  document.getElementById('chall-active').textContent = challs.filter(c => c.status==='pending'||c.status==='playing').length;
+  document.getElementById('chall-completed').textContent = challs.filter(c => c.status==='done').length;
+  document.getElementById('chall-total').textContent = challs.reduce((s,c) => s+c.bet, 0);
   if (!sorted.length) { list.innerHTML = '<div class="text-center py-12 text-mist"><p class="text-3xl mb-2">⚔️</p><p>No challenges yet</p></div>'; return; }
   list.innerHTML = sorted.map(c => {
     const ago = Math.floor((Date.now()-c.created)/3600000);
     const timeStr = ago < 1 ? 'Just now' : ago < 24 ? ago+'h ago' : Math.floor(ago/24)+'d ago';
-    const labels = { open:'🔓 Open', ongoing:'⏳ Playing', completed:'✅ Done' };
+    const labels = { pending:'🔓 Pending', playing:'⏳ Playing', submitted:'📸 Submitted', done:'✅ Done' };
+    const colors = { pending:'lime', playing:'yellow-400', submitted:'blue-400', done:'purple-400' };
     let act = '';
-    if (c.status === 'open') act = `<button class="btn-lime text-xs px-3 py-1" onclick="acceptChall('${c.id}')">Accept</button>`;
-    else if (c.status === 'ongoing') act = `<button class="btn-ghost text-xs px-3 py-1" onclick="openChSS('${c.id}')">📸 Submit</button>`;
+    if (c.status === 'pending') act = `<button class="btn-lime text-xs px-3 py-1" onclick="acceptChall('${c.id}')">Accept</button>`;
+    else if (c.status === 'playing') act = `<button class="btn-ghost text-xs px-3 py-1" onclick="openChSS('${c.id}')">📸 Submit Result</button>`;
+    else if (c.status === 'submitted') act = `<button class="btn-lime text-xs px-3 py-1" onclick="confirmChall('${c.id}')">✅ Confirm</button>`;
     return `<div class="bg-turf border border-line rounded-xl p-4 mb-2 hover:border-lime/20 transition">
-      <div class="flex items-center justify-between gap-3"><div class="font-bold text-ice text-sm">${c.myTeam} <span class="text-mist font-normal">vs</span> ${c.oppTeam}</div><div class="text-gold font-extrabold text-sm">🪙 ${c.bet.toLocaleString()}</div></div>
-      <div class="flex items-center gap-3 mt-2 text-xs text-mist flex-wrap"><span class="text-${c.status==='open'?'lime':c.status==='ongoing'?'yellow-400':'purple-400'} font-semibold">${labels[c.status]}</span><span>👤 ${c.opponent}</span><span>🕐 ${timeStr}</span>${c.winner?'<span>🏆 '+c.winner+'</span>':''}<span class="flex-1"></span>${act}</div>
+      <div class="flex items-center justify-between gap-3">
+        <div class="font-bold text-ice text-sm">${c.team1} <span class="text-mist font-normal">vs</span> ${c.team2}</div>
+        <div class="text-yellow-400 font-extrabold text-sm">🪙 ${c.bet} pt${c.bet>1?'s':''}</div>
+      </div>
+      <div class="flex items-center gap-3 mt-2 text-xs text-mist flex-wrap">
+        <span class="text-${colors[c.status]} font-semibold">${labels[c.status]||c.status}</span>
+        <span>🕐 ${timeStr}</span>
+        ${c.winner ? '<span>🏆 '+c.winner+'</span>' : ''}
+        ${c.submittedBy ? '<span>📸 by '+c.submittedBy+'</span>' : ''}
+        ${c.confirmedBy ? '<span>✅ by '+c.confirmedBy+'</span>' : ''}
+        <span class="flex-1"></span>${act}
+      </div>
     </div>`;
   }).join('');
 }
@@ -457,34 +472,37 @@ function closeChallengeModal() {
 }
 
 function createChallenge() {
-  const myTeam = document.getElementById('ch-myteam').value.trim();
-  const opponent = document.getElementById('ch-opponent').value.trim();
-  const oppTeam = document.getElementById('ch-oppteam').value.trim();
+  const t1 = document.getElementById('ch-myteam').value.trim();
+  const t2 = document.getElementById('ch-oppteam').value.trim();
+  const who = document.getElementById('ch-opponent').value.trim();
   const bet = parseInt(document.getElementById('ch-bet').value);
   const rules = document.getElementById('ch-rules').value.trim();
-  if (!myTeam || !opponent || !bet || bet < 100) { alert('Fill all fields. Min bet: 100'); return; }
-  challs.push({ id:'ch-'+Date.now().toString(36), myTeam, opponent, oppTeam: oppTeam||opponent+"'s team", bet, rules, status:'open', created:Date.now(), winner:null });
+  if (!t1 || !t2 || !bet || bet < 1 || bet > 5) { alert('Enter team names. Bet between 1-5 points.'); return; }
+  challs.push({ id:'ch-'+Date.now().toString(36), team1:t1, team2:t2, bet, by:who||'Someone', rules, status:'pending', created:Date.now(), winner:null, submittedBy:null, confirmedBy:null });
   saveChalls(); closeChallengeModal(); renderChalls();
-  document.getElementById('ch-myteam').value=''; document.getElementById('ch-opponent').value='';
-  document.getElementById('ch-oppteam').value=''; document.getElementById('ch-bet').value='500'; document.getElementById('ch-rules').value='';
+  document.getElementById('ch-myteam').value=''; document.getElementById('ch-oppteam').value='';
+  document.getElementById('ch-opponent').value=''; document.getElementById('ch-bet').value='3'; document.getElementById('ch-rules').value='';
 }
 
+// Accept: opponent confirms the challenge
 function acceptChall(id) {
   const c = challs.find(x => x.id === id);
   if (!c) return;
-  const yourTeam = prompt('Enter YOUR exact DLS team name:');
-  if (!yourTeam || !yourTeam.trim()) return;
-  // When accepting, swap perspective so the accepter plays as their team
-  c.status = 'ongoing';
+  const name = prompt('Enter your name/username:');
+  if (!name || !name.trim()) return;
+  c.status = 'playing';
+  c.acceptedBy = name.trim();
   saveChalls(); renderChalls();
 }
 
+// Submit result: one player uploads screenshot + declares winner
 function openChSS(id) {
   challActiveId = id;
   challSSData = null;
   document.getElementById('ch-ss-preview').style.display = 'none';
   document.getElementById('ch-ss-input').value = '';
   document.getElementById('chall-ss-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
 }
 function closeSSModal() {
   document.getElementById('chall-ss-modal').classList.add('hidden');
@@ -501,18 +519,25 @@ function submitChResult() {
   if (!challActiveId || !challSSData) { alert('Upload a screenshot first!'); return; }
   const c = challs.find(x => x.id === challActiveId);
   if (!c) return;
-  const winner = prompt('Enter the exact WINNING team name from the result screen:');
+  const winner = prompt('Enter the WINNING team name:');
   if (!winner || !winner.trim()) return;
-  c.status = 'completed';
+  c.status = 'submitted';
   c.winner = winner.trim();
-  c.completedAt = Date.now();
+  c.submittedBy = c.submittedBy || window.currentUser?.username || 'Someone';
   saveChalls(); closeSSModal(); renderChalls();
 }
 
-// Initialize challenges when page loads
+// Confirm: other player agrees with the result
+function confirmChall(id) {
+  const c = challs.find(x => x.id === id);
+  if (!c) return;
+  const name = prompt('Enter your name to confirm:');
+  if (!name || !name.trim()) return;
+  c.status = 'done';
+  c.confirmedBy = name.trim();
+  saveChalls(); renderChalls();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Check if challenges page exists before trying to load
-  if (document.getElementById('chall-list')) {
-    loadChalls();
-  }
+  if (document.getElementById('chall-list')) loadChalls();
 });
