@@ -418,9 +418,9 @@ function loadChalls() {
   if (!challs.length) {
     const n = Date.now();
     challs = [
-      { id:'c1', team1:'FC Blaze', team2:'Thunder FC', bet:3, by:'Player1', status:'pending', created:n-7200000, winner:null, submittedBy:null, confirmedBy:null },
-      { id:'c2', team1:'Strikers', team2:'Messi FC', bet:5, by:'Player2', status:'playing', created:n-3600000, winner:null, submittedBy:null, confirmedBy:null },
-      { id:'c3', team1:'FC Blaze', team2:'Legends', bet:2, by:'Player1', status:'done', created:n-86400000*3, winner:'FC Blaze', submittedBy:'Player1', confirmedBy:'Player2' },
+      { id:'c1', team1:'FC Blaze', team2:'TBD', bet:3, status:'pending', created:n-7200000, winner:null, verifiedBy:null },
+      { id:'c2', team1:'Strikers', team2:'Messi FC', bet:5, status:'playing', created:n-3600000, winner:null, verifiedBy:null },
+      { id:'c3', team1:'FC Blaze', team2:'Legends', bet:2, status:'done', created:n-86400000*3, winner:'FC Blaze', verifiedBy:'AI' },
     ];
     saveChalls();
   }
@@ -473,25 +473,22 @@ function closeChallengeModal() {
 
 function createChallenge() {
   const t1 = document.getElementById('ch-myteam').value.trim();
-  const t2 = document.getElementById('ch-oppteam').value.trim();
-  const who = document.getElementById('ch-opponent').value.trim();
   const bet = parseInt(document.getElementById('ch-bet').value);
   const rules = document.getElementById('ch-rules').value.trim();
-  if (!t1 || !t2 || !bet || bet < 1 || bet > 5) { alert('Enter team names. Bet between 1-5 points.'); return; }
-  challs.push({ id:'ch-'+Date.now().toString(36), team1:t1, team2:t2, bet, by:who||'Someone', rules, status:'pending', created:Date.now(), winner:null, submittedBy:null, confirmedBy:null });
+  if (!t1 || bet < 1 || bet > 5) { alert('Enter your team name. Bet between 1-5 points.'); return; }
+  challs.push({ id:'ch-'+Date.now().toString(36), team1:t1, team2:'TBD', bet, rules, status:'pending', created:Date.now(), winner:null, verifiedBy:null });
   saveChalls(); closeChallengeModal(); renderChalls();
-  document.getElementById('ch-myteam').value=''; document.getElementById('ch-oppteam').value='';
-  document.getElementById('ch-opponent').value=''; document.getElementById('ch-bet').value='3'; document.getElementById('ch-rules').value='';
+  document.getElementById('ch-myteam').value=''; document.getElementById('ch-bet').value='3'; document.getElementById('ch-rules').value='';
 }
 
 // Accept: opponent confirms the challenge
 function acceptChall(id) {
   const c = challs.find(x => x.id === id);
   if (!c) return;
-  const name = prompt('Enter your name/username:');
-  if (!name || !name.trim()) return;
+  const theirTeam = prompt('Enter YOUR exact DLS team name:');
+  if (!theirTeam || !theirTeam.trim()) return;
   c.status = 'playing';
-  c.acceptedBy = name.trim();
+  c.team2 = theirTeam.trim();
   saveChalls(); renderChalls();
 }
 
