@@ -565,14 +565,33 @@ async function submitChResult() {
     const data = await res.json();
 
     if (data.winner) {
-      c.status = 'done';
-      c.winner = data.winner;
-      c.score = (data.homeScore || '?') + '-' + (data.awayScore || '?');
-      c.verifiedBy = 'AI';
-      saveChalls();
-      closeSSModal();
-      renderChalls();
-      alert('🏆 ' + data.winner + ' wins! Points auto-assigned.');
+      // Case-insensitive match: compare AI winner against both team names
+      const aiWinner = data.winner.trim();
+      const matchT1 = c.team1 && c.team1.toLowerCase() === aiWinner.toLowerCase();
+      const matchT2 = c.team2 && c.team2.toLowerCase() === aiWinner.toLowerCase();
+      
+      if (!matchT1 && !matchT2) {
+        // AI returned a name that doesn't match either team
+        alert('AI detected "' + aiWinner + '" as winner, but it doesn\'t match ' + c.team1 + ' or ' + c.team2 + '. Enter manually.');
+        const manual = prompt('Enter the WINNING team name (as shown on screen):');
+        if (manual && manual.trim()) {
+          c.status = 'done';
+          c.winner = manual.trim();
+          c.score = (data.homeScore || '?') + '-' + (data.awayScore || '?');
+          c.verifiedBy = 'AI';
+          saveChalls(); closeSSModal(); renderChalls();
+        }
+      } else {
+        c.status = 'done';
+        // Use the EXACT name from the challenge (preserving the user's casing)
+        c.winner = matchT1 ? c.team1 : c.team2;
+        c.score = (data.homeScore || '?') + '-' + (data.awayScore || '?');
+        c.verifiedBy = 'AI';
+        saveChalls();
+        closeSSModal();
+        renderChalls();
+        alert('🏆 ' + c.winner + ' wins! Points assigned.');
+      }
     } else {
       // AI couldn't read it - manual fallback
       const manual = prompt('AI could not read result. Enter the WINNING team name manually:');
