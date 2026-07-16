@@ -516,56 +516,66 @@ function previewChSS(e) {
   r.readAsDataURL(f);
 }
 
-// AI Vision: analyze screenshot to auto-detect winner
-async function analyzeWithAI() {
-  if (!challSSData) { alert('Upload a screenshot first!'); return; }
-  const btn = document.getElementById('ai-analyze-btn');
-  const resultDiv = document.getElementById('ai-result');
+// AI Vision is now part of submitChResult() below
+
+async function submitChResult() {
+  if (!challActiveId || !challSSData) { alert('Upload a screenshot first!'); return; }
+  const c = challs.find(x => x.id === challActiveId);
+  if (!c) return;
+
+  // Auto-analyze with AI to make final decision
+  const btn = document.getElementById('submit-final-btn');
   btn.disabled = true;
-  btn.textContent = '🤖 Analyzing...';
-  resultDiv.innerHTML = '<p class="text-sm text-yellow-400">AI is reading the result screen...</p>';
+  btn.textContent = '🤖 AI Deciding...';
 
   try {
     const AI_URL = 'https://keith-switching-meaning-calculate.trycloudflare.com/api/vision/analyze';
     const res = await fetch(AI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: challSSData, prompt: 'Read this DLS match result screen. What is the winner team name, loser team name, and score?' })
+      body: JSON.stringify({ 
+        image: challSSData, 
+        prompt: 'This is a Dream League Soccer match result screen. The two teams playing are: ' + c.team1 + ' vs ' + c.team2 + '. Look carefully at the screen and tell me: which team won? Return ONLY a JSON with keys: winner, loser, homeScore, awayScore.'
+      })
     });
     const data = await res.json();
 
-    if (data.error) {
-      resultDiv.innerHTML = '<p class="text-sm text-red-400">AI could not read the result: ' + data.error + '</p>';
-      btn.disabled = false;
-      btn.textContent = '🤖 AI Verify';
-      return;
+    if (data.winner) {
+      c.status = 'done';
+      c.winner = data.winner;
+      c.score = (data.homeScore || '?') + '-' + (data.awayScore || '?');
+      c.verifiedBy = 'AI';
+      saveChalls();
+      closeSSModal();
+      renderChalls();
+      alert('🏆 ' + data.winner + ' wins! Points auto-assigned.');
+    } else {
+      // AI couldn't read it - manual fallback
+      const manual = prompt('AI could not read result. Enter the WINNING team name manually:');
+      if (manual && manual.trim()) {
+        c.status = 'done';
+        c.winner = manual.trim();
+        c.verifiedBy = 'Manual';
+        saveChalls();
+        closeSSModal();
+        renderChalls();
+      }
     }
-
-    document.getElementById('ch-ai-winner').value = data.winner || '';
-    document.getElementById('ch-ai-score').value = (data.homeScore || '?') + ' - ' + (data.awayScore || '?');
-    resultDiv.innerHTML = '<p class="text-sm text-green-400">✅ AI detected: <b>' + (data.winner || 'Unknown') + '</b> wins (' + (data.homeScore||'?') + '-' + (data.awayScore||'?') + ')</p>';
   } catch (e) {
-    resultDiv.innerHTML = '<p class="text-sm text-red-400">AI offline. Enter winner manually.</p>';
+    // AI offline - manual fallback
+    const manual = prompt('AI offline. Enter the WINNING team name manually:');
+    if (manual && manual.trim()) {
+      c.status = 'done';
+      c.winner = manual.trim();
+      c.verifiedBy = 'Manual';
+      saveChalls();
+      closeSSModal();
+      renderChalls();
+    }
   }
 
   btn.disabled = false;
-  btn.textContent = '🤖 AI Verify';
-}
-
-function submitChResult() {
-  if (!challActiveId || !challSSData) { alert('Upload a screenshot first!'); return; }
-  const c = challs.find(x => x.id === challActiveId);
-  if (!c) return;
-  
-  // Use AI-detected winner or manual entry
-  const aiWinner = document.getElementById('ch-ai-winner').value.trim();
-  const winner = aiWinner || prompt('Enter the WINNING team name:');
-  if (!winner || !winner.trim()) return;
-  
-  c.status = 'submitted';
-  c.winner = winner.trim();
-  c.submittedBy = c.submittedBy || window.currentUser?.username || 'Someone';
-  saveChalls(); closeSSModal(); renderChalls();
+  btn.textContent = '🏆 Submit & Auto-Verify';
 }
 
 // Confirm: other player agrees with the result

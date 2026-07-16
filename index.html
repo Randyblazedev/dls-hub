@@ -710,17 +710,10 @@
         <input type="file" id="ch-ss-input" accept="image/*" class="hidden" onchange="previewChSS(event)">
         <div id="ch-ss-preview" class="hidden mb-3 text-center"><img id="ch-ss-img" class="max-h-32 rounded-lg border border-line"></div>
         
-        <!-- AI Vision Analysis -->
         <div id="ai-result" class="mb-3"></div>
-        <div class="flex gap-2 mb-3">
-          <input type="text" id="ch-ai-winner" placeholder="Winner (auto or manual)" class="flex-1 px-3 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none focus:border-lime">
-          <input type="text" id="ch-ai-score" placeholder="Score" class="w-20 px-2 py-2 rounded-xl bg-pitch border border-line text-ice text-sm outline-none text-center" readonly>
-        </div>
-        <button id="ai-analyze-btn" onclick="analyzeWithAI()" class="btn-ghost w-full py-2 text-sm mb-3">🤖 AI Verify Screenshot</button>
-        
         <div class="flex gap-2">
           <button onclick="closeSSModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
-          <button onclick="submitChResult()" class="btn-lime flex-1 py-2 text-sm">Submit Winner</button>
+          <button id="submit-final-btn" onclick="submitChResult()" class="btn-lime flex-1 py-2 text-sm">🏆 Submit & Auto-Verify</button>
         </div>
       </div>
     </div>
