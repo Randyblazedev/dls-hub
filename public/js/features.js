@@ -415,15 +415,7 @@ let challActiveId = null;
 
 function loadChalls() {
   try { challs = JSON.parse(localStorage.getItem(CHALL_KEY)) || []; } catch { challs = []; }
-  if (!challs.length) {
-    const n = Date.now();
-    challs = [
-      { id:'c1', team1:'FC Blaze', team2:'TBD', bet:3, status:'pending', created:n-7200000, winner:null, verifiedBy:null },
-      { id:'c2', team1:'Strikers', team2:'Messi FC', bet:5, status:'playing', created:n-3600000, winner:null, verifiedBy:null },
-      { id:'c3', team1:'FC Blaze', team2:'Legends', bet:2, status:'done', created:n-86400000*3, winner:'FC Blaze', verifiedBy:'AI' },
-    ];
-    saveChalls();
-  }
+  // No demo challenges - users create their own
   renderChalls();
 }
 function saveChalls() { localStorage.setItem(CHALL_KEY, JSON.stringify(challs)); }
