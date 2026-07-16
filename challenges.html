@@ -272,10 +272,16 @@
       if (!currentChallengeId || !ssDataUrl) { alert('Take a screenshot first!'); return; }
       const c = challenges.find(x => x.id === currentChallengeId);
       if (!c) return;
+
+      // Ask who won
+      const declaredWinner = prompt('Enter the exact name of the WINNING team (as shown on the DLS result screen):', c.myTeam);
+      if (!declaredWinner || declaredWinner.trim() === '') return;
+
       c.status = 'completed';
-      c.winner = c.myTeam;
-      c.screenshot = ssDataUrl.substring(0, 200) + '...[screenshot stored]';
+      c.winner = declaredWinner.trim();
+      c.screenshot = 'Stored'; // Don't store large base64 in localStorage
       c.completedAt = Date.now();
+      c.resultNotes = 'Winner: ' + c.winner + ' — screenshot saved locally';
       save();
       closeModal('ss');
       render();
