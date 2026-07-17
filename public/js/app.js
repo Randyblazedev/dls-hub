@@ -2330,7 +2330,7 @@ window.lbTapUser = function(uid, username, avatar) {
         <img src="${escAttr(avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=0f1f17&color=b5ff47&size=80`)}" class="w-12 h-12 rounded-full object-cover" />
         <div>
           <p class="text-ice font-medium">${escHtml(username)}</p>
-          ${window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : u?.last_seen ? '<p class="text-xs text-mist">Last seen ' + window.timeAgo(new Date(u.last_seen)) + '</p>' : '<p class="text-xs text-mist">Offline</p>'
+          ' + (window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : (u?.last_seen ? '<p class="text-xs text-mist">Last seen ' + window.timeAgo(new Date(u.last_seen)) + '</p>' : '<p class="text-xs text-mist">Offline</p>')) + '
         </div>
       </div>
       ${!isMe ? `
