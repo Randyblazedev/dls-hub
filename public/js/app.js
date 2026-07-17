@@ -2323,6 +2323,7 @@ window.lbTapUser = function(uid, username, avatar) {
   const sheet = document.createElement("div");
   sheet.id = "lb-action-sheet";
   sheet.className = "fixed inset-0 z-50 flex items-end justify-center";
+  var statusHtml = window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : (u?.last_seen ? '<p class="text-xs text-mist">Last seen ' + window.timeAgo(new Date(u.last_seen)) + '</p>' : '<p class="text-xs text-mist">Offline</p>');
   sheet.innerHTML = `
     <div class="absolute inset-0 bg-black/60" data-action="close-sheet"></div>
     <div class="relative bg-turf border border-line rounded-t-2xl w-full max-w-lg p-5 pb-8 space-y-3 animate-slide-up">
@@ -2330,7 +2331,7 @@ window.lbTapUser = function(uid, username, avatar) {
         <img src="${escAttr(avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=0f1f17&color=b5ff47&size=80`)}" class="w-12 h-12 rounded-full object-cover" />
         <div>
           <p class="text-ice font-medium">${escHtml(username)}</p>
-          ' + (window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : (u?.last_seen ? '<p class="text-xs text-mist">Last seen ' + window.timeAgo(new Date(u.last_seen)) + '</p>' : '<p class="text-xs text-mist">Offline</p>')) + '
+          ${statusHtml}
         </div>
       </div>
       ${!isMe ? `
