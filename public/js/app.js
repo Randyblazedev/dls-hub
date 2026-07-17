@@ -2330,7 +2330,7 @@ window.lbTapUser = function(uid, username, avatar) {
         <img src="${escAttr(avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=0f1f17&color=b5ff47&size=80`)}" class="w-12 h-12 rounded-full object-cover" />
         <div>
           <p class="text-ice font-medium">${escHtml(username)}</p>
-          ${window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : '<p class="text-xs text-mist">Offline</p>'}
+          ${window.onlineUserIds?.has(uid) ? '<p class="text-xs text-blue-400 flex items-center gap-1"><span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span> Online now</p>' : '(u?.last_seen ? 'Last seen ' + window.timeAgo(new Date(u.last_seen)) + '</p>' : '<p class="text-xs text-mist">Offline</p>')}
         </div>
       </div>
       ${!isMe ? `
@@ -2409,7 +2409,7 @@ window.viewPublicProfile = async function(uid, username) {
         </div>
         <h2 class="text-ice text-xl font-display">${escHtml(u?.username || username)}</h2>
         ${u?.team ? `<p class="text-mist text-sm mt-1">⚽ ${escHtml(u.team)}</p>` : ""}
-        <p class="text-mist text-xs mt-1">${isOnline ? '<span class="text-blue-400">● Online now</span>' : "Offline"}</p>
+        <p class="text-mist text-xs mt-1">${isOnline ? '<span class="text-blue-400">● Online now</span>' : (u?.last_seen ? 'Last seen ' + window.timeAgo(new Date(u.last_seen)) : 'Offline')}</p>
         <div class="flex gap-6 mt-4 text-center">
           <div><p class="text-lime font-display text-xl">${u?.postcount || 0}</p><p class="text-mist text-xs">Posts</p></div>
           <div><p class="text-lime font-display text-xl">${u?.joinedat ? new Date(u.joinedat).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—"}</p><p class="text-mist text-xs">Joined</p></div>
