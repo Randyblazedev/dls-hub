@@ -662,3 +662,80 @@
       </div>
     </div>
 
+  <nav id="bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-50 bg-turf/95 backdrop-blur border-t border-line flex items-center justify-around py-2 px-2 safe-area-bottom">
+    <button onclick="navigate('home')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span class="text-[10px]">Home</span>
+    </button>
+    <button onclick="navigate('feed')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="newspaper" class="w-5 h-5"></i>
+      <span class="text-[10px]">Feed</span>
+    </button>
+    <button onclick="navigate('leaderboards')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="trophy" class="w-5 h-5"></i>
+      <span class="text-[10px]">Ranks</span>
+    </button>
+    <button onclick="document.getElementById('post-content')?.focus(); navigate('feed');" class="flex items-center justify-center w-12 h-12 -mt-5 bg-lime rounded-full shadow-lg hover:brightness-110 transition">
+      <i data-lucide="plus" class="w-6 h-6 text-pitch"></i>
+    </button>
+    <button onclick="navigate('chat')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="message-circle" class="w-5 h-5"></i>
+      <span class="text-[10px]">Chat</span>
+    </button>
+    <button onclick="navigate('profile')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="user" class="w-5 h-5"></i>
+      <span class="text-[10px]">Profile</span>
+    </button>
+  </nav>
+
+  <!-- Report Modal -->
+  <div id="report-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+      <h3 class="font-display text-xl text-lime mb-4">Report Content</h3>
+      <p id="report-target-label" class="text-mist text-sm mb-4"></p>
+      <div class="space-y-2 mb-6">
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Spam" class="accent-yellow-400" /> <span class="text-ice text-sm">Spam</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Harassment" class="accent-yellow-400" /> <span class="text-ice text-sm">Harassment</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Inappropriate" class="accent-yellow-400" /> <span class="text-ice text-sm">Inappropriate</span>
+        </label>
+        <label class="flex items-center gap-3 p-3 rounded-xl border border-line cursor-pointer hover:border-lime/30 transition report-reason-label">
+          <input type="radio" name="report-reason" value="Other" class="accent-yellow-400" /> <span class="text-ice text-sm">Other</span>
+        </label>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeReportModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+        <button onclick="submitReport()" class="btn-lime flex-1 py-2 text-sm">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Themed Confirm Modal -->
+  <div id="confirm-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-turf border border-line rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+      <p id="confirm-msg" class="text-ice text-sm mb-6"></p>
+      <div class="flex justify-end gap-3">
+        <button id="confirm-cancel" class="btn-ghost px-4 py-2 text-sm">Cancel</button>
+        <button id="confirm-ok" class="bg-coral text-white px-4 py-2 rounded-xl text-sm font-medium hover:opacity-80 transition">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="hidden fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 z-[60] bg-turf border border-line rounded-xl px-5 py-3 text-sm shadow-2xl flex items-center gap-3 max-w-xs w-auto">
+    <i data-lucide="check-circle" id="toast-icon" class="w-4 h-4 text-lime"></i>
+    <span id="toast-msg"></span>
+  </div>
+
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- App scripts in order — plain scripts, no ES modules -->
+  <script src="public/js/supabase-config.js"></script>
+  <script src="public/js/app.js"></script>
+  <script src="public/js/features.js"></script>
+</body>
+</html>
