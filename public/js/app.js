@@ -2494,3 +2494,17 @@ document.addEventListener("DOMContentLoaded", () => {
   lucide.createIcons();
   navigate("home");
 });
+
+async function signInWithGoogle() {
+  const { error } = await window._supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
+
+  if (error) {
+    console.error(error);
+    alert(error.message);
+  }
+};
