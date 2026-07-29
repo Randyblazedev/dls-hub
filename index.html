@@ -74,6 +74,7 @@
         <button onclick="navigate('chat')"          class="nav-link hover:text-ice transition">Community Chat</button>
         <button onclick="navigate('dm')"            class="nav-link hover:text-ice transition">Messages</button>
         <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('tournaments')" class="nav-link hover:text-ice transition">Tournaments</button>
       </div>
 
       <!-- Right side controls — always in a flex row so install button can't break layout -->
@@ -137,6 +138,7 @@
         <button onclick="navigate('chat');toggleMobileMenu()"         class="text-left hover:text-ice">Community Chat</button>
         <button onclick="navigate('dm');toggleMobileMenu()"           class="text-left hover:text-ice">Messages</button>
         <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
+        <button onclick="navigate('tournaments')" class="nav-link hover:text-ice transition">Tournaments</button>
         <button onclick="navigate('admin');toggleMobileMenu()"        class="text-left hover:text-ice">Admin</button>
         <button onclick="navigate('profile');toggleMobileMenu()"      class="text-left hover:text-ice">My Profile</button>
         <button onclick="handleSignOut()"                              class="text-left text-coral">Sign Out</button>
@@ -615,6 +617,83 @@
       </div>
     </div>
 
+    <!-- ═══════ TOURNAMENTS LIST ═══════ -->
+    <div id="page-tournaments" class="page-view hidden">
+      <div class="max-w-4xl mx-auto px-4 py-20">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="font-display text-4xl text-lime">Tournaments</h1>
+            <p class="text-mist text-sm">Compete in DLS tournaments and prove you're the best</p>
+          </div>
+          <button onclick="openCreateTournamentModal()" class="btn-lime px-5 py-2.5 text-sm">+ Create</button>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <button onclick="switchTournamentFilter('all')" id="tfilter-all" class="tournament-filter tournament-filter-active">All</button>
+          <button onclick="switchTournamentFilter('registration')" id="tfilter-registration" class="tournament-filter">Registration</button>
+          <button onclick="switchTournamentFilter('in_progress')" id="tfilter-in_progress" class="tournament-filter">In Progress</button>
+          <button onclick="switchTournamentFilter('completed')" id="tfilter-completed" class="tournament-filter">Completed</button>
+        </div>
+
+        <!-- Tournament list -->
+        <div id="tournament-list" class="space-y-4">
+          <div class="text-center text-mist py-12">
+            <i data-lucide="loader" class="w-6 h-6 mx-auto animate-spin mb-2"></i>
+            Loading tournaments...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ TOURNAMENT DETAIL ═══════ -->
+    <div id="page-tournament-detail" class="page-view hidden">
+      <div class="max-w-4xl mx-auto px-4 py-20">
+        <button onclick="navigate('tournaments')" class="flex items-center gap-2 text-mist hover:text-lime mb-4 transition text-sm">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Tournaments
+        </button>
+
+        <!-- Tournament header -->
+        <div id="td-header" class="bg-turf border border-line rounded-2xl p-6 mb-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 id="td-name" class="font-display text-3xl text-lime"></h2>
+              <p id="td-game" class="text-mist text-sm mt-1"></p>
+              <p id="td-desc" class="text-ice text-sm mt-2"></p>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <span id="td-status-badge" class="inline-block px-3 py-1 rounded-full text-xs font-medium"></span>
+              <p id="td-prize" class="text-lime font-display text-lg"></p>
+              <p id="td-fee" class="text-mist text-xs"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 mt-4 text-sm text-mist border-t border-line pt-4">
+            <span id="td-players-count"><i data-lucide="users" class="w-4 h-4 inline mr-1"></i> 0 players</span>
+            <span id="td-created-by"><i data-lucide="user" class="w-4 h-4 inline mr-1"></i> Created by <span class="text-ice"></span></span>
+          </div>
+          <!-- Action buttons -->
+          <div id="td-actions" class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-line">
+            <button id="td-join-btn" onclick="joinTournament()" class="btn-lime px-5 py-2 text-sm">Join Tournament</button>
+            <button id="td-start-btn" onclick="startTournament()" class="btn-ghost px-5 py-2 text-sm hidden">Start Tournament</button>
+            <button id="td-delete-btn" onclick="deleteTournament()" class="bg-coral/10 text-coral border border-coral/30 px-5 py-2 rounded-xl text-sm font-medium hover:bg-coral/20 transition hidden">Delete Tournament</button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <button onclick="switchTDTab('bracket')" id="tdtab-bracket" class="td-tab td-tab-active">Bracket</button>
+          <button onclick="switchTDTab('standings')" id="tdtab-standings" class="td-tab">Standings</button>
+          <button onclick="switchTDTab('players')" id="tdtab-players" class="td-tab">Players</button>
+          <button onclick="switchTDTab('matches')" id="tdtab-matches" class="td-tab">Matches</button>
+        </div>
+
+        <!-- Tab content -->
+        <div id="td-content" class="bg-turf border border-line rounded-2xl p-6 min-h-[300px]">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════ TERMS OF SERVICE ═══════ -->
     <div id="page-terms" class="page-view hidden">
       <div class="max-w-3xl mx-auto py-8 px-4">
@@ -705,13 +784,13 @@
       <i data-lucide="home" class="w-5 h-5"></i>
       <span class="text-[10px]">Home</span>
     </button>
-    <button onclick="navigate('feed')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
-      <i data-lucide="newspaper" class="w-5 h-5"></i>
-      <span class="text-[10px]">Feed</span>
-    </button>
     <button onclick="navigate('leaderboards')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
       <i data-lucide="trophy" class="w-5 h-5"></i>
       <span class="text-[10px]">Ranks</span>
+    </button>
+    <button onclick="navigate('tournaments')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="trophy" class="w-5 h-5"></i>
+      <span class="text-[10px]">Tourney</span>
     </button>
     <button onclick="document.getElementById('post-content')?.focus(); navigate('feed');" class="flex items-center justify-center w-12 h-12 -mt-5 bg-lime rounded-full shadow-lg hover:brightness-110 transition">
       <i data-lucide="plus" class="w-6 h-6 text-pitch"></i>
@@ -719,6 +798,10 @@
     <button onclick="navigate('chat')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
       <i data-lucide="message-circle" class="w-5 h-5"></i>
       <span class="text-[10px]">Chat</span>
+    </button>
+    <button onclick="navigate('tournaments')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
+      <i data-lucide="trophy" class="w-5 h-5"></i>
+      <span class="text-[10px]">Tourney</span>
     </button>
     <button onclick="navigate('profile')" class="flex flex-col items-center gap-1 text-mist hover:text-lime transition">
       <i data-lucide="user" class="w-5 h-5"></i>
@@ -748,6 +831,94 @@
       <div class="flex gap-3">
         <button onclick="closeReportModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
         <button onclick="submitReport()" class="btn-lime flex-1 py-2 text-sm">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Tournament Modal -->
+  <div id="create-tournament-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="font-display text-xl text-lime">Create Tournament</h3>
+        <button onclick="closeCreateTournamentModal()" class="text-mist hover:text-ice"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div id="ct-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="form-label">Tournament Name</label>
+          <input id="ct-name" type="text" class="form-input" placeholder="e.g. DLS Champions Cup" />
+        </div>
+        <div>
+          <label class="form-label">Description</label>
+          <textarea id="ct-desc" class="form-input" rows="3" placeholder="Tournament rules and info..."></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="form-label">Game</label>
+            <input id="ct-game" type="text" class="form-input" value="DLS 25" />
+          </div>
+          <div>
+            <label class="form-label">Max Players</label>
+            <select id="ct-max" class="form-input">
+              <option value="4">4</option>
+              <option value="8">8</option>
+              <option value="16" selected>16</option>
+              <option value="32">32</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Prize</label>
+          <input id="ct-prize" type="text" class="form-input" placeholder="e.g. Bragging rights, $50" />
+        </div>
+        <div>
+          <label class="form-label">Entry Fee (optional)</label>
+          <input id="ct-fee" type="number" class="form-input" placeholder="0" min="0" step="0.01" />
+        </div>
+        <button onclick="handleCreateTournament()" class="btn-lime w-full py-3 text-base">Create Tournament</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Modal -->
+  <div id="payment-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+      <h3 class="font-display text-xl text-lime mb-4">Tournament Payment</h3>
+      <p id="pmt-info" class="text-mist text-sm mb-4">Pay the entry fee to join this tournament.</p>
+      <p id="pmt-amount" class="text-ice font-display text-3xl text-center mb-6">$0</p>
+      <div class="space-y-3 mb-6">
+        <div>
+          <label class="form-label">Payment Reference</label>
+          <input id="pmt-reference" type="text" class="form-input" placeholder="Transaction ID or reference" />
+        </div>
+      </div>
+      <div id="pmt-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>
+      <div class="flex gap-3">
+        <button onclick="closePaymentModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+        <button onclick="confirmPayment()" class="btn-lime flex-1 py-2 text-sm">Confirm Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit Result Modal -->
+  <div id="submit-result-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+      <h3 class="font-display text-xl text-lime mb-4">Submit Match Result</h3>
+      <p id="sr-info" class="text-mist text-sm mb-4"></p>
+      <div class="space-y-4 mb-6">
+        <div>
+          <label id="sr-player1-label" class="form-label">Player 1 Score</label>
+          <input id="sr-score1" type="number" class="form-input" placeholder="0" min="0" />
+        </div>
+        <div>
+          <label id="sr-player2-label" class="form-label">Player 2 Score</label>
+          <input id="sr-score2" type="number" class="form-input" placeholder="0" min="0" />
+        </div>
+      </div>
+      <div id="sr-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>
+      <div class="flex gap-3">
+        <button onclick="closeSubmitResultModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
+        <button onclick="handleSubmitResult()" class="btn-lime flex-1 py-2 text-sm">Submit</button>
       </div>
     </div>
   </div>

@@ -98,7 +98,7 @@ function subscribeChanges(table, fetchFn, opts = {}) {
 /** Navigates to a page by name */
 window.navigate = function (page) {
   // Guard: redirect unauthenticated users away from protected pages
-  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "admin"];
+  const protected_ = ["feed", "chat", "dm", "profile", "profile-public", "leaderboards", "admin", "tournaments", "tournament-detail"];
   if (protected_.includes(page) && !currentUser) {
     navigate("login");
     showToast("Please log in first", "error");
@@ -128,6 +128,8 @@ window.navigate = function (page) {
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
   if (page === "admin")        initAdmin();
+  if (page === "tournaments")  initTournamentsList();
+  if (page === "tournament-detail") initTournamentDetail();
 
   // Re-init icons after DOM changes
   setTimeout(() => lucide.createIcons(), 50);
