@@ -620,12 +620,12 @@
     <!-- ═══════ TOURNAMENTS LIST ═══════ -->
     <div id="page-tournaments" class="page-view hidden">
       <div class="max-w-4xl mx-auto px-4 py-20">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h1 class="font-display text-4xl text-lime">Tournaments</h1>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div class="min-w-0 flex-1">
+            <h1 class="font-display text-2xl sm:text-4xl text-lime">Tournaments</h1>
             <p class="text-mist text-sm">Compete in DLS tournaments and prove you're the best</p>
           </div>
-          <button onclick="openCreateTournamentModal()" class="btn-lime px-5 py-2.5 text-sm">+ Create</button>
+          <button onclick="openCreateTournamentModal()" class="btn-lime px-5 py-2.5 text-sm shrink-0 self-start sm:self-auto">+ Create</button>
         </div>
 
         <!-- Filters -->
