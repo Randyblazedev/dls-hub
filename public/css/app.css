@@ -661,6 +661,9 @@ html.light .report-item:hover { background: #f5f5f5; }
 
 /* ── Tournament tab active ── */
 .td-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 20px;
   border-radius: 10px;
   font-size: 14px;
@@ -670,7 +673,6 @@ html.light .report-item:hover { background: #f5f5f5; }
   transition: all 0.15s ease;
   background: transparent;
   cursor: pointer;
-  white-space: nowrap;
 }
 .td-tab:hover { color: #ffffff; border-color: rgba(255,255,255,0.15); }
 .td-tab-active {
@@ -682,6 +684,9 @@ html.light .report-item:hover { background: #f5f5f5; }
 
 /* ── Tournament filter tabs ── */
 .tournament-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 16px;
   border-radius: 9999px;
   font-size: 13px;
@@ -691,7 +696,6 @@ html.light .report-item:hover { background: #f5f5f5; }
   transition: all 0.15s ease;
   background: transparent;
   cursor: pointer;
-  white-space: nowrap;
 }
 .tournament-filter:hover { color: #ffffff; border-color: rgba(255,255,255,0.15); }
 .tournament-filter-active {

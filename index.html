@@ -625,13 +625,13 @@
             <h1 class="font-display text-2xl sm:text-4xl text-lime">Tournaments</h1>
             <p class="text-mist text-sm">Compete in DLS tournaments and prove you're the best</p>
           </div>
-          <button onclick="openCreateTournamentModal()" class="btn-lime px-5 py-2.5 text-sm shrink-0 self-start sm:self-auto">+ Create</button>
+          <button onclick="openCreateTournamentModal()" class="btn-lime px-5 py-2.5 text-sm shrink-0">+ Create</button>
         </div>
 
         <!-- Filters -->
-        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div class="flex flex-wrap justify-center gap-2 mb-2">
           <button onclick="switchTournamentFilter('all')" id="tfilter-all" class="tournament-filter tournament-filter-active">All</button>
-          <button onclick="switchTournamentFilter('registration')" id="tfilter-registration" class="tournament-filter">Registration</button>
+          <button onclick="switchTournamentFilter('registration')" id="tfilter-registration" class="tournament-filter">Open</button>
           <button onclick="switchTournamentFilter('in_progress')" id="tfilter-in_progress" class="tournament-filter">In Progress</button>
           <button onclick="switchTournamentFilter('completed')" id="tfilter-completed" class="tournament-filter">Completed</button>
         </div>
@@ -672,7 +672,7 @@
             <span id="td-created-by"><i data-lucide="user" class="w-4 h-4 inline mr-1"></i> Created by <span class="text-ice"></span></span>
           </div>
           <!-- Action buttons -->
-          <div id="td-actions" class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-line">
+          <div id="td-actions" class="flex flex-wrap justify-center gap-2 mt-4 pt-4 border-t border-line">
             <button id="td-join-btn" onclick="joinTournament()" class="btn-lime px-5 py-2 text-sm">Join Tournament</button>
             <button id="td-start-btn" onclick="startTournament()" class="btn-ghost px-5 py-2 text-sm hidden">Start Tournament</button>
             <button id="td-delete-btn" onclick="deleteTournament()" class="bg-coral/10 text-coral border border-coral/30 px-5 py-2 rounded-xl text-sm font-medium hover:bg-coral/20 transition hidden">Delete Tournament</button>
@@ -782,7 +782,7 @@
   <nav id="bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-50 bg-turf/95 backdrop-blur border-t border-line flex items-center justify-around py-1 px-1 safe-area-bottom">
     <button onclick="navigate('home')" class="flex flex-col items-center gap-0.5 text-mist hover:text-lime transition">
       <i data-lucide="home" class="w-5 h-5"></i>
-      <span class="text-[9px]">Home</span>
+      <span class="text-[10px]">Home</span>
     </button>
     <button onclick="navigate('leaderboards')" class="flex flex-col items-center gap-0.5 text-mist hover:text-lime transition">
       <i data-lucide="trophy" class="w-5 h-5"></i>
@@ -794,7 +794,7 @@
     </button>
     <button onclick="document.getElementById('post-content')?.focus(); navigate('feed');" class="flex flex-col items-center gap-0.5 text-mist hover:text-lime transition">
       <i data-lucide="plus" class="w-5 h-5"></i>
-      <span class="text-[9px]">Post</span>
+      <span class="text-[10px]">Post</span>
     </button>
     <button onclick="navigate('chat')" class="flex flex-col items-center gap-0.5 text-mist hover:text-lime transition">
       <i data-lucide="message-circle" class="w-5 h-5"></i>
@@ -825,7 +825,7 @@
           <input type="radio" name="report-reason" value="Other" class="accent-yellow-400" /> <span class="text-ice text-sm">Other</span>
         </label>
       </div>
-      <div class="flex gap-3">
+      <div class="flex gap-3 justify-center">
         <button onclick="closeReportModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
         <button onclick="submitReport()" class="btn-lime flex-1 py-2 text-sm">Submit</button>
       </div>
@@ -890,7 +890,7 @@
         </div>
       </div>
       <div id="pmt-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>
-      <div class="flex gap-3">
+      <div class="flex gap-3 justify-center">
         <button onclick="closePaymentModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
         <button onclick="confirmPayment()" class="btn-lime flex-1 py-2 text-sm">Confirm Payment</button>
       </div>
@@ -913,7 +913,7 @@
         </div>
       </div>
       <div id="sr-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>
-      <div class="flex gap-3">
+      <div class="flex gap-3 justify-center">
         <button onclick="closeSubmitResultModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
         <button onclick="handleSubmitResult()" class="btn-lime flex-1 py-2 text-sm">Submit</button>
       </div>

@@ -62,12 +62,14 @@ window.toggleSound = function () {
  * @param {Function} fetchFn — called whenever the table changes
  * @param {object}   [opts]  — { filter: "dm_id=eq.xxx", interval: 5000 }
  */
+// Store active subscriptions so visibility change can force-refresh them
+const _activeSubs = new Set();
+
 function subscribeChanges(table, fetchFn, opts = {}) {
   let pollTimer  = null;
-  let live       = false; // only true once a REAL postgres_changes event has fired
   let channel    = null;
-  const interval = opts.interval || 5000;
-  const chanName = `rt:${table}:${Math.random().toString(36).slice(2)}`; // avoid name collisions across DM threads
+  const interval = opts.interval || 3000;
+  const chanName = `rt:${table}:${Math.random().toString(36).slice(2)}`;
 
   try {
     channel = supabase
@@ -75,21 +77,29 @@ function subscribeChanges(table, fetchFn, opts = {}) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table, filter: opts.filter || undefined },
-        () => { live = true; fetchFn(); }
+        () => { fetchFn(); }
       )
       .subscribe();
-  } catch (_) { /* Realtime unavailable — rely on polling */ }
+  } catch (_) {}
 
-  // Safety-net poll ALWAYS runs; we just skip a fetch if realtime just delivered one,
-  // so a silently-broken realtime channel (e.g. table not in publication, or RLS
-  // blocking replication) can never leave the UI stuck until manual refresh.
+  const sub = { fetchFn, id: chanName };
+  _activeSubs.add(sub);
   pollTimer = setInterval(() => { fetchFn(); }, interval);
 
-  return () => {
+  const unsubscribe = () => {
+    _activeSubs.delete(sub);
     if (channel) { supabase.removeChannel(channel); channel = null; }
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   };
+  return unsubscribe;
 }
+
+// Force-refresh all active subscriptions when user comes back to the tab
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    _activeSubs.forEach(s => { try { s.fetchFn(); } catch (_) {} });
+  }
+});
 
 // ═══════════════════════════════════════════════════════════
 //  ROUTER
@@ -1244,6 +1254,7 @@ function initChat() {
 
       if (isFirstLoad) container.innerHTML = "";
 
+      const isOnChat = !document.getElementById("page-chat")?.classList.contains("hidden");
       let addedNew = false;
       data.forEach(m => {
         if (!chatRenderedIds.has(m.id)) {
@@ -1252,11 +1263,22 @@ function initChat() {
           addedNew = true;
           if (currentUser && m.authorid !== currentUser.id && lastChatMsgId) {
             playNotifSound();
+            if (!isOnChat) {
+              const preview = (m.content || "").slice(0, 50);
+              showToast(`💬 ${m.authorname || "Someone"}: ${preview}`);
+              const currentCount = parseInt(document.getElementById("notif-badge")?.textContent || "0") || 0;
+              updateNotifBadge(currentCount + 1);
+              const badge = document.getElementById("notif-badge");
+              if (badge) {
+                badge.classList.add("animate-bounce");
+                setTimeout(() => badge.classList.remove("animate-bounce"), 2000);
+              }
+            }
           }
         }
       });
-      if (data.length) lastChatMsgId = data[data.length - 1].id;
 
+      if (data.length) lastChatMsgId = data[data.length - 1].id;
       if (addedNew && (isFirstLoad || wasNearBottom)) {
         container.scrollTop = container.scrollHeight;
       }
