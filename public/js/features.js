@@ -167,14 +167,32 @@ document.addEventListener('click', function(e) {
 });
 
 // ═══ REPORT ═══
-window.reportContent = async function(type, id) {
+var _reportType = null;
+var _reportId = null;
+window.reportContent = function(type, id) {
   if (!window.currentUser) { window.showToast('Log in to report', 'error'); return; }
-  var reasons = ['Spam', 'Harassment', 'Inappropriate', 'Other'];
-  var reason = prompt('Report reason:\n' + reasons.map(function(r,i) { return (i+1) + '. ' + r; }).join('\n') + '\nEnter 1-4:');
-  if (!reason || reason < 1 || reason > 4) return;
+  _reportType = type;
+  _reportId = id;
+  var modal = document.getElementById('report-modal');
+  var label = document.getElementById('report-target-label');
+  if (label) label.textContent = 'Reporting ' + type;
+  document.querySelectorAll('input[name="report-reason"]').forEach(function(r) { r.checked = false; });
+  if (modal) modal.classList.remove('hidden');
+};
+window.closeReportModal = function() {
+  var modal = document.getElementById('report-modal');
+  if (modal) modal.classList.add('hidden');
+  _reportType = null;
+  _reportId = null;
+};
+window.submitReport = async function() {
+  var selected = document.querySelector('input[name="report-reason"]:checked');
+  if (!selected) { window.showToast('Please select a reason', 'error'); return; }
+  var reason = selected.value;
   try {
-    await window.supabase.from('reports').insert({ reported_by: window.currentUser.id, content_type: type, content_id: id, reason: reasons[reason - 1], created_at: new Date().toISOString() });
+    await window.supabase.from('reports').insert({ reported_by: window.currentUser.id, content_type: _reportType, content_id: _reportId, reason: reason, created_at: new Date().toISOString() });
     window.showToast('Report submitted ✅');
+    window.closeReportModal();
   } catch (_) { window.showToast('Failed to report', 'error'); }
 };
 
