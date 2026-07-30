@@ -401,6 +401,42 @@ window.adminRemoveUser = async function(uid, username) {
   }
 };
 
+// ═══ POINTS DISPLAY ═══
+window.updateNavPoints = function () {
+  if (!window.currentUser) {
+    var np = document.getElementById('nav-points');
+    if (np) np.classList.add('hidden');
+    return;
+  }
+  window.supabase.from('users').select('points').eq('uid', window.currentUser.id).single().then(function (res) {
+    if (res.data) {
+      var el = document.getElementById('nav-points-amount');
+      if (el) el.textContent = res.data.points || 0;
+      var np = document.getElementById('nav-points');
+      if (np) np.classList.remove('hidden');
+    }
+  }).catch(function () {});
+};
+
+window.updateProfilePoints = function () {
+  if (!window.currentUser) return;
+  window.supabase.from('users').select('points').eq('uid', window.currentUser.id).single().then(function (res) {
+    if (res.data) {
+      var el = document.getElementById('profile-points-amount');
+      if (el) el.textContent = res.data.points || 0;
+    }
+  }).catch(function () {});
+};
+
+// Hook into app.js onAuthChange by patching the navigate function
+// to refresh points when user visits profile or tournament pages.
+var origNavigate = window.navigate;
+window.navigate = function (page) {
+  if (origNavigate) origNavigate(page);
+  if (page === 'profile') setTimeout(window.updateProfilePoints, 300);
+  if (page === 'tournaments' || page === 'tournament-detail' || page === 'tournament-list') setTimeout(window.updateNavPoints, 300);
+};
+
 // ═══ BOOTSTRAP ═══
 // Wait for app.js module to load (defer < module timing)
 function waitForAppReady(cb) {
@@ -421,10 +457,19 @@ document.addEventListener('DOMContentLoaded', function() {
   waitForAppReady(function() {
     waitForUser(function() {
       // Init presence if already logged in
-      if (window.currentUser) initPresence();
+      if (window.currentUser) {
+        initPresence();
+        setTimeout(window.updateNavPoints, 500);
+      }
       // Watch for auth changes
       window.onAuthChange(function(user) {
-        if (user) setTimeout(initPresence, 500);
+        if (user) {
+          setTimeout(initPresence, 500);
+          setTimeout(window.updateNavPoints, 1000);
+        } else {
+          var np = document.getElementById('nav-points');
+          if (np) np.classList.add('hidden');
+        }
       });
     });
   });
@@ -438,7 +483,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 var _currentTournament = null;
 var _currentTournamentFilter = 'all';
-var _pendingPaymentTournamentId = null;
 
 // ── TOURNAMENTS LIST ──
 window.initTournamentsList = async function () {
@@ -488,7 +532,7 @@ async function loadTournaments() {
           '</div>' +
           '<div class="flex flex-col items-end gap-1 shrink-0">' +
             '<span class="inline-block px-3 py-0.5 rounded-full text-xs font-medium ' + sc + '">' + sl + '</span>' +
-            (t.entry_fee > 0 ? '<span class="text-mist text-xs">$' + parseFloat(t.entry_fee).toFixed(2) + ' fee</span>' : '<span class="text-mist text-xs">Free</span>') +
+            (t.points_cost > 0 ? '<span class="text-lime text-xs font-medium">' + t.points_cost + ' pts</span>' : '<span class="text-mist text-xs">Free</span>') +
           '</div>' +
         '</div>' +
       '</div>';
@@ -521,7 +565,7 @@ window.initTournamentDetail = async function () {
     document.getElementById('td-desc').textContent = t.description || '';
     document.getElementById('td-desc').classList.toggle('hidden', !t.description);
     document.getElementById('td-prize').textContent = t.prize ? '🏆 ' + t.prize : '';
-    document.getElementById('td-fee').textContent = t.entry_fee > 0 ? 'Entry fee: $' + parseFloat(t.entry_fee).toFixed(2) : 'Free entry';
+    document.getElementById('td-fee').textContent = t.points_cost > 0 ? 'Entry fee: ' + t.points_cost + ' pts' : 'Free entry';
 
     var statusColors = { registration: 'bg-blue-500/20 text-blue-400', in_progress: 'bg-lime/20 text-lime', completed: 'bg-green-500/20 text-green-400', cancelled: 'bg-coral/20 text-coral' };
     var statusLabels = { registration: 'Registration Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' };
@@ -926,23 +970,57 @@ window.joinTournament = async function () {
     return;
   }
 
+  // Points check: if tournament has a points cost, verify user has enough
+  var cost = _currentTournament.points_cost || 0;
+  if (cost > 0) {
+    var { data: userData } = await window.supabase
+      .from('users')
+      .select('points')
+      .eq('uid', window.currentUser.id)
+      .single();
+
+    var userPoints = (userData && userData.points) || 0;
+    if (userPoints < cost) {
+      window.showToast('You need ' + cost + ' pts to join. You have ' + userPoints + '.', 'error');
+      return;
+    }
+  }
+
   try {
+    // Deduct points first if there's a cost
+    if (cost > 0) {
+      var { error: deductError } = await window.supabase
+        .from('users')
+        .update({ points: window.supabase.rpc('decrement', { x: cost }) })
+        .eq('uid', window.currentUser.id);
+
+      if (deductError) {
+        var { data: userData2 } = await window.supabase
+          .from('users')
+          .select('points')
+          .eq('uid', window.currentUser.id)
+          .single();
+        var currentPts = (userData2 && userData2.points) || 0;
+        await window.supabase
+          .from('users')
+          .update({ points: Math.max(0, currentPts - cost) })
+          .eq('uid', window.currentUser.id);
+      }
+    }
+
+    // Always auto-approve — no more payment modal
     await window.supabase.from('tournament_players').insert({
       tournament_id: _currentTournament.id,
       user_id: window.currentUser.id,
       username: window.currentUserDoc?.username || 'Anonymous',
       avatar: window.currentUserDoc?.avatar || '',
-      status: _currentTournament.entry_fee > 0 ? 'pending' : 'approved',
+      status: 'approved',
       joined_at: new Date().toISOString()
     });
 
-    if (_currentTournament.entry_fee > 0) {
-      _pendingPaymentTournamentId = _currentTournament.id;
-      openPaymentModal(_currentTournament.entry_fee);
-    } else {
-      window.showToast('Joined tournament ✅');
-      initTournamentDetail();
-    }
+    window.showToast('Joined tournament ✅');
+    setTimeout(window.updateNavPoints, 300);
+    initTournamentDetail();
   } catch (err) {
     window.showToast('Failed to join', 'error');
   }
@@ -980,7 +1058,7 @@ window.handleCreateTournament = async function () {
       game: game || 'DLS 25',
       max_players: maxPlayers,
       prize: prize,
-      entry_fee: fee,
+      points_cost: fee,
       status: 'registration',
       created_by: window.currentUser.id,
       created_at: new Date().toISOString()
@@ -1223,7 +1301,7 @@ async function advanceRoundIfComplete(tournamentId, completedRound) {
 window.deleteTournament = async function () {
   if (!_currentTournament || !window.currentUser) return;
   if (_currentTournament.created_by !== window.currentUser.id) { window.showToast('Only the host can delete', 'error'); return; }
-  if (!await window.showConfirm('Delete "' + _currentTournament.name + '"? This will remove all matches, players, and payment records.')) return;
+  if (!await window.showConfirm('Delete "' + _currentTournament.name + '"? This will remove all matches and players.')) return;
 
   try {
     await window.supabase.from('tournaments').delete().eq('id', _currentTournament.id);
@@ -1234,47 +1312,4 @@ window.deleteTournament = async function () {
   }
 };
 
-// ── PAYMENT ──
-window.openPaymentModal = function (amount) {
-  document.getElementById('pmt-amount').textContent = '$' + parseFloat(amount).toFixed(2);
-  document.getElementById('pmt-info').textContent = 'Pay the entry fee to join this tournament.';
-  document.getElementById('payment-modal').classList.remove('hidden');
-  document.getElementById('pmt-error').classList.add('hidden');
-};
 
-window.closePaymentModal = function () {
-  document.getElementById('payment-modal').classList.add('hidden');
-};
-
-window.confirmPayment = async function () {
-  var reference = document.getElementById('pmt-reference').value.trim();
-  var errEl = document.getElementById('pmt-error');
-
-  if (!reference) {
-    errEl.textContent = 'Please enter a payment reference';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  if (!_pendingPaymentTournamentId || !window.currentUser) return;
-
-  try {
-    await window.supabase.from('tournament_payments').insert({
-      tournament_id: _pendingPaymentTournamentId,
-      user_id: window.currentUser.id,
-      username: window.currentUserDoc?.username || 'Anonymous',
-      amount: _currentTournament.entry_fee,
-      reference: reference,
-      status: 'pending',
-      paid_at: new Date().toISOString()
-    });
-
-    window.closePaymentModal();
-    window.showToast('Payment submitted for verification ✅');
-    _pendingPaymentTournamentId = null;
-    initTournamentDetail();
-  } catch (err) {
-    errEl.textContent = 'Failed to submit payment';
-    errEl.classList.remove('hidden');
-  }
-};

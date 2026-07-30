@@ -93,6 +93,11 @@
         <!-- Online status -->
         <span id="online-count" class="text-xs text-mist bg-turf border border-line rounded-full px-2 py-1 hidden"><span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span><span id="online-num">0</span> online</span>
 
+        <!-- Points display (logged-in only) -->
+        <span id="nav-points" class="hidden text-xs text-lime font-medium bg-turf border border-line rounded-full px-3 py-1">
+          <i data-lucide="coins" class="w-3.5 h-3.5 inline mr-1"></i><span id="nav-points-amount">0</span>
+        </span>
+
         <!-- Theme toggle -->
         <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
           <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
@@ -366,6 +371,7 @@
             <h2 id="profile-username" class="font-display text-3xl text-lime"></h2>
             <p id="profile-email" class="text-mist text-sm mb-2"></p>
             <p id="profile-team" class="text-ice text-sm"></p>
+            <p id="profile-points" class="text-lime text-sm font-medium"><i data-lucide="coins" class="w-4 h-4 inline mr-1"></i><span id="profile-points-amount">0</span> points</p>
             <p id="profile-lastseen" class="text-xs text-mist mt-1"></p>
           </div>
           <button onclick="toggleEditProfile()" class="btn-ghost text-sm px-4 py-2">Edit Profile</button>
@@ -869,30 +875,10 @@
           <input id="ct-prize" type="text" class="form-input" placeholder="e.g. Bragging rights, $50" />
         </div>
         <div>
-          <label class="form-label">Entry Fee (optional)</label>
-          <input id="ct-fee" type="number" class="form-input" placeholder="0" min="0" step="0.01" />
+          <label class="form-label">Points Cost (optional)</label>
+          <input id="ct-fee" type="number" class="form-input" placeholder="0" min="0" step="1" />
         </div>
         <button onclick="handleCreateTournament()" class="btn-lime w-full py-3 text-base">Create Tournament</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Payment Modal -->
-  <div id="payment-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div class="bg-turf border border-line rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
-      <h3 class="font-display text-xl text-lime mb-4">Tournament Payment</h3>
-      <p id="pmt-info" class="text-mist text-sm mb-4">Pay the entry fee to join this tournament.</p>
-      <p id="pmt-amount" class="text-ice font-display text-3xl text-center mb-6">$0</p>
-      <div class="space-y-3 mb-6">
-        <div>
-          <label class="form-label">Payment Reference</label>
-          <input id="pmt-reference" type="text" class="form-input" placeholder="Transaction ID or reference" />
-        </div>
-      </div>
-      <div id="pmt-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>
-      <div class="flex gap-3 justify-center">
-        <button onclick="closePaymentModal()" class="btn-ghost flex-1 py-2 text-sm">Cancel</button>
-        <button onclick="confirmPayment()" class="btn-lime flex-1 py-2 text-sm">Confirm Payment</button>
       </div>
     </div>
   </div>

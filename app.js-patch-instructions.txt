@@ -1,0 +1,12 @@
+app.js — Add these 2 lines
+
+1. After the line `if (page === "profile")      initProfile();`
+   Add:
+   `if (page === "profile")      setTimeout(window.updateProfilePoints, 300);`
+
+2. After the line `if (page === "tournaments")  initTournamentsList();`
+   Add:
+   `if (page === "tournaments" || page === "tournament-detail" || page === "tournament-list") setTimeout(window.updateNavPoints, 300);`
+
+These hook the points display into page navigation so the nav bar and profile page
+always show up-to-date points whenever the user visits relevant pages.
