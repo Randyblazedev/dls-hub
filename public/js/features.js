@@ -564,8 +564,11 @@ window.initTournamentDetail = async function () {
     document.getElementById('td-game').textContent = t.game || 'DLS 25';
     document.getElementById('td-desc').textContent = t.description || '';
     document.getElementById('td-desc').classList.toggle('hidden', !t.description);
-    document.getElementById('td-prize').textContent = t.prize ? '🏆 ' + t.prize : '';
+    document.getElementById('td-prize').textContent = t.prize ? '🏆 ' + t.prize : (t.points_prize > 0 ? '🏆 ' + t.points_prize + ' pts' : '');
     document.getElementById('td-fee').textContent = t.points_cost > 0 ? 'Entry fee: ' + t.points_cost + ' pts' : 'Free entry';
+    if (t.points_cost > 0 && t.points_prize > 0) {
+      document.getElementById('td-prize').textContent += ' · Winner: ' + t.points_prize + ' pts';
+    }
 
     var statusColors = { registration: 'bg-blue-500/20 text-blue-400', in_progress: 'bg-lime/20 text-lime', completed: 'bg-green-500/20 text-green-400', cancelled: 'bg-coral/20 text-coral' };
     var statusLabels = { registration: 'Registration Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' };
@@ -824,7 +827,9 @@ async function renderPlayers() {
       html += '<div class="flex items-center gap-3">';
       html += '<img src="' + window.escAttr(avatarSrc) + '" class="w-8 h-8 rounded-full object-cover" />';
       html += '<div><p class="text-ice text-sm font-medium">' + window.escHtml(p.username) + '</p>';
-      html += '<p class="text-xs ' + (statusColors[p.status] || 'text-mist') + '">' + p.status + '</p></div></div>';
+      html += '<p class="text-xs ' + (statusColors[p.status] || 'text-mist') + '">' + p.status + '</p>';
+      if (p.team_name) html += '<p class="text-xs text-lime mt-0.5">Team: ' + window.escHtml(p.team_name) + '</p>';
+      html += '</div></div>';
       if (isCreator && isRegistration && p.status === 'pending') {
         html += '<div class="flex gap-2">';
         html += '<button onclick="approvePlayer(\'' + p.id + '\')" class="text-green-400 text-xs hover:text-green-300 border border-green-400/30 px-3 py-1 rounded-full">Approve</button>';
@@ -866,6 +871,19 @@ async function renderMatches() {
 
     var isActivePlayer = false;
     var currentUserId = window.currentUser ? window.currentUser.id : '';
+    var isCreator = _currentTournament && _currentTournament.created_by === currentUserId;
+    var statusLabels = {
+      pending: 'Pending',
+      in_progress: 'In Progress',
+      pending_confirmation: 'Awaiting Confirmation',
+      completed: 'Completed'
+    };
+    var statusColors = {
+      pending: 'text-mist',
+      in_progress: 'text-lime',
+      pending_confirmation: 'text-yellow-400',
+      completed: 'text-green-400'
+    };
     var html = '<div class="space-y-3">';
 
     matches.forEach(function (m) {
@@ -876,7 +894,7 @@ async function renderMatches() {
       html += '<div class="match-card">';
       html += '<div class="flex items-center justify-between mb-2">';
       html += '<span class="text-xs text-mist font-medium">Round ' + m.round + ' · Match ' + (m.match_index + 1) + '</span>';
-      html += '<span class="text-xs ' + (m.status === 'completed' ? 'text-green-400' : m.status === 'in_progress' ? 'text-lime' : 'text-mist') + '">' + m.status + '</span>';
+      html += '<span class="text-xs ' + (statusColors[m.status] || 'text-mist') + '">' + (statusLabels[m.status] || m.status) + '</span>';
       html += '</div>';
 
       if (isBye) {
@@ -897,9 +915,20 @@ async function renderMatches() {
         if (m.status === 'completed' && m.winner_name) {
           html += '<p class="text-xs text-green-400 mt-2">Winner: ' + window.escHtml(m.winner_name) + '</p>';
         }
+
+        if (m.status === 'pending_confirmation') {
+          var submittedByMe = m.result_submitted_by === currentUserId;
+          html += '<p class="text-xs text-yellow-400 mt-2">⏳ Result submitted' + (submittedByMe ? ' — waiting for opponent confirmation' : ' — needs your confirmation') + '</p>';
+          if (m.screenshot_url) {
+            html += '<a href="' + window.escAttr(m.screenshot_url) + '" target="_blank" rel="noopener" class="text-xs text-lime underline mt-1 inline-block">View score screenshot</a>';
+          }
+          if (!submittedByMe && (userInMatch || isCreator)) {
+            html += '<div class="mt-2"><button onclick="confirmMatchResult(\'' + m.id + '\')" class="btn-lime text-xs px-4 py-1.5">Confirm Result</button></div>';
+          }
+        }
       }
 
-      if (userInMatch && m.status !== 'completed') {
+      if (userInMatch && (m.status === 'pending' || m.status === 'in_progress')) {
         html += '<button onclick="openSubmitResultModal(\'' + m.id + '\')" class="mt-3 btn-lime text-xs px-4 py-1.5">Submit Result</button>';
       }
 
@@ -986,26 +1015,16 @@ window.joinTournament = async function () {
     }
   }
 
-  try {
-    // Deduct points first if there's a cost
-    if (cost > 0) {
-      var { error: deductError } = await window.supabase
-        .from('users')
-        .update({ points: window.supabase.rpc('decrement', { x: cost }) })
-        .eq('uid', window.currentUser.id);
+  // Real DLS game team name is required — used to verify matches
+  var teamName = (window.prompt('Enter your real DLS game team name (shown to opponents for match verification):') || '').trim();
+  if (!teamName) { window.showToast('Your DLS team name is required to join', 'error'); return; }
+  if (teamName.length > 40) { window.showToast('Team name too long (max 40 chars)', 'error'); return; }
 
-      if (deductError) {
-        var { data: userData2 } = await window.supabase
-          .from('users')
-          .select('points')
-          .eq('uid', window.currentUser.id)
-          .single();
-        var currentPts = (userData2 && userData2.points) || 0;
-        await window.supabase
-          .from('users')
-          .update({ points: Math.max(0, currentPts - cost) })
-          .eq('uid', window.currentUser.id);
-      }
+  try {
+    // Deduct entry fee server-side (atomic, cheat-proof)
+    if (cost > 0) {
+      var { error: deductError } = await window.supabase.rpc('decrement_points', { amount: cost });
+      if (deductError) { window.showToast('Failed to deduct points', 'error'); return; }
     }
 
     // Always auto-approve — no more payment modal
@@ -1014,6 +1033,7 @@ window.joinTournament = async function () {
       user_id: window.currentUser.id,
       username: window.currentUserDoc?.username || 'Anonymous',
       avatar: window.currentUserDoc?.avatar || '',
+      team_name: teamName,
       status: 'approved',
       joined_at: new Date().toISOString()
     });
@@ -1045,6 +1065,7 @@ window.handleCreateTournament = async function () {
   var maxPlayers = parseInt(document.getElementById('ct-max').value) || 16;
   var prize = document.getElementById('ct-prize').value.trim();
   var fee = parseFloat(document.getElementById('ct-fee').value) || 0;
+  var pointsPrize = parseInt(document.getElementById('ct-points-prize').value) || 0;
   var errEl = document.getElementById('ct-error');
 
   if (!name) { errEl.textContent = 'Tournament name is required'; errEl.classList.remove('hidden'); return; }
@@ -1059,6 +1080,7 @@ window.handleCreateTournament = async function () {
       max_players: maxPlayers,
       prize: prize,
       points_cost: fee,
+      points_prize: pointsPrize,
       status: 'registration',
       created_by: window.currentUser.id,
       created_at: new Date().toISOString()
@@ -1071,6 +1093,7 @@ window.handleCreateTournament = async function () {
     document.getElementById('ct-desc').value = '';
     document.getElementById('ct-prize').value = '';
     document.getElementById('ct-fee').value = '';
+    document.getElementById('ct-points-prize').value = '';
 
     window.showToast('Tournament created! 🎉');
     window._currentTournamentId = data.id;
@@ -1093,6 +1116,14 @@ window.startTournament = async function () {
     .eq('status', 'approved');
 
   if (!players || players.length < 2) { window.showToast('Need at least 2 approved players', 'error'); return; }
+
+  // Anti-cheat: everyone must register their real DLS team name first
+  var missingTeam = players.filter(function (p) { return !(p.team_name || '').trim(); });
+  if (missingTeam.length) {
+    var names = missingTeam.map(function (p) { return p.username; }).slice(0, 3).join(', ');
+    window.showToast('Can\'t start — missing DLS team name: ' + names + (missingTeam.length > 3 ? ' +' + (missingTeam.length - 3) : ''), 'error');
+    return;
+  }
 
   // Fisher-Yates shuffle for random seeding
   var shuffled = players.slice();
@@ -1173,6 +1204,8 @@ window.openSubmitResultModal = function (matchId) {
   document.getElementById('sr-error').classList.add('hidden');
   document.getElementById('sr-score1').value = '';
   document.getElementById('sr-score2').value = '';
+  document.getElementById('sr-screenshot').value = '';
+  document.getElementById('sr-screenshot-preview').classList.add('hidden');
 
   window.supabase.from('tournament_matches').select('*').eq('id', matchId).single().then(function (res) {
     var m = res.data;
@@ -1191,11 +1224,53 @@ window.closeSubmitResultModal = function () {
   _pendingResultMatchId = null;
 };
 
+window.previewResultScreenshot = function (e) {
+  var file = e.target.files && e.target.files[0];
+  var preview = document.getElementById('sr-screenshot-preview');
+  if (!file || !preview) return;
+  if (file.size > 5 * 1024 * 1024) { window.showToast('Screenshot too large (max 5MB)', 'error'); e.target.value = ''; return; }
+  preview.src = URL.createObjectURL(file);
+  preview.classList.remove('hidden');
+};
+
+window.uploadResultScreenshot = async function (file) {
+  var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  var path = 'evidence/' + window.currentUser.id + '/' + Date.now() + '.' + ext;
+  var { error } = await window.supabase.storage.from('avatars').upload(path, file, { upsert: false });
+  if (error) throw error;
+  var { data } = window.supabase.storage.from('avatars').getPublicUrl(path);
+  return data.publicUrl;
+};
+
+window.confirmMatchResult = async function (matchId) {
+  if (!window.currentUser) { window.showToast('Please log in', 'error'); return; }
+  var { data: match, error } = await window.supabase.from('tournament_matches').select('*').eq('id', matchId).single();
+  if (error || !match) { window.showToast('Match not found', 'error'); return; }
+  if (match.status !== 'pending_confirmation') { window.showToast('Nothing to confirm', 'error'); return; }
+
+  var isPlayer = match.player1_id === window.currentUser.id || match.player2_id === window.currentUser.id;
+  var isHost = _currentTournament && _currentTournament.created_by === window.currentUser.id;
+  if (!isPlayer && !isHost) { window.showToast('Only the players or host can confirm', 'error'); return; }
+  if (isPlayer && !isHost && match.result_submitted_by === window.currentUser.id) { window.showToast('Wait for your opponent to confirm', 'error'); return; }
+
+  await window.supabase.from('tournament_matches').update({
+    status: 'completed',
+    winner_id: match.proposed_winner_id,
+    winner_name: match.proposed_winner_name
+  }).eq('id', matchId);
+
+  window.showToast('Result confirmed ✅');
+  await advanceRoundIfComplete(match.tournament_id, match.round);
+  initTournamentDetail();
+};
+
 window.handleSubmitResult = async function () {
   if (!_pendingResultMatchId || !window.currentUser) return;
   var score1 = parseInt(document.getElementById('sr-score1').value);
   var score2 = parseInt(document.getElementById('sr-score2').value);
   var errEl = document.getElementById('sr-error');
+  var fileInput = document.getElementById('sr-screenshot');
+  var file = fileInput && fileInput.files[0];
 
   if (isNaN(score1) || isNaN(score2)) {
     errEl.textContent = 'Enter valid scores for both players';
@@ -1209,10 +1284,23 @@ window.handleSubmitResult = async function () {
     return;
   }
 
+  if (!file) {
+    errEl.textContent = 'A score screenshot is required';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   var winnerId, winnerName;
   try {
     var { data: match } = await window.supabase.from('tournament_matches').select('*').eq('id', _pendingResultMatchId).single();
     if (!match) { window.showToast('Match not found', 'error'); return; }
+    if (match.status === 'pending_confirmation') {
+      errEl.textContent = 'A result is already pending confirmation for this match';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    var screenshotUrl = await window.uploadResultScreenshot(file);
 
     if (score1 > score2) {
       winnerId = match.player1_id;
@@ -1225,18 +1313,18 @@ window.handleSubmitResult = async function () {
     await window.supabase.from('tournament_matches').update({
       player1_score: score1,
       player2_score: score2,
-      winner_id: winnerId,
-      winner_name: winnerName,
-      status: 'completed'
+      screenshot_url: screenshotUrl,
+      proposed_winner_id: winnerId,
+      proposed_winner_name: winnerName,
+      result_submitted_by: window.currentUser.id,
+      status: 'pending_confirmation'
     }).eq('id', _pendingResultMatchId);
 
     window.closeSubmitResultModal();
-    window.showToast('Result submitted ✅');
-
-    await advanceRoundIfComplete(match.tournament_id, match.round);
+    window.showToast('Result submitted. Waiting for opponent confirmation ⏳');
     initTournamentDetail();
   } catch (err) {
-    errEl.textContent = 'Failed to submit result';
+    errEl.textContent = 'Failed to submit result: ' + (err.message || 'unknown error');
     errEl.classList.remove('hidden');
   }
 };

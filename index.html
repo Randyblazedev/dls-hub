@@ -874,9 +874,15 @@
           <label class="form-label">Prize</label>
           <input id="ct-prize" type="text" class="form-input" placeholder="e.g. Bragging rights, $50" />
         </div>
-        <div>
-          <label class="form-label">Points Cost (optional)</label>
-          <input id="ct-fee" type="number" class="form-input" placeholder="0" min="0" step="1" />
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="form-label">Points Cost (entry)</label>
+            <input id="ct-fee" type="number" class="form-input" placeholder="0" min="0" step="1" />
+          </div>
+          <div>
+            <label class="form-label">Points Prize (winner)</label>
+            <input id="ct-points-prize" type="number" class="form-input" placeholder="0" min="0" step="1" />
+          </div>
         </div>
         <button onclick="handleCreateTournament()" class="btn-lime w-full py-3 text-base">Create Tournament</button>
       </div>
@@ -896,6 +902,12 @@
         <div>
           <label id="sr-player2-label" class="form-label">Player 2 Score</label>
           <input id="sr-score2" type="number" class="form-input" placeholder="0" min="0" />
+        </div>
+        <div>
+          <label class="form-label">Score Screenshot (required)</label>
+          <input id="sr-screenshot" type="file" accept="image/*" class="form-input" onchange="previewResultScreenshot(event)" />
+          <img id="sr-screenshot-preview" class="hidden mt-2 rounded-lg max-h-40 object-cover w-full" alt="Screenshot preview" />
+          <p class="text-mist text-xs mt-2">A screenshot of the final score is required. Your opponent must confirm the result before it counts.</p>
         </div>
       </div>
       <div id="sr-error" class="hidden mb-4 p-3 bg-coral/10 border border-coral/30 rounded-lg text-coral text-sm"></div>

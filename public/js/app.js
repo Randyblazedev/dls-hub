@@ -135,10 +135,12 @@ window.navigate = function (page) {
   if (page === "feed")         initFeed();
   if (page === "chat")         initChat();
   if (page === "profile")      initProfile();
+  if (page === "profile")      setTimeout(window.updateProfilePoints, 300);
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
   if (page === "admin")        initAdmin();
   if (page === "tournaments")  initTournamentsList();
+  if (page === "tournaments" || page === "tournament-detail" || page === "tournament-list") setTimeout(window.updateNavPoints, 300);
   if (page === "tournament-detail") initTournamentDetail();
 
   // Re-init icons after DOM changes
@@ -725,6 +727,7 @@ window.submitPost = async function () {
     const newCount = (currentUserDoc?.postcount || 0) + 1;
     await supabase.from("users").update({ postcount: newCount }).eq("uid", currentUser.id);
     currentUserDoc = { ...currentUserDoc, postcount: newCount };
+    setTimeout(window.updateNavPoints, 800);
 
     textarea.value = "";
     removePostImage();
