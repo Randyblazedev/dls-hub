@@ -45,14 +45,26 @@ BEGIN
 END;
 $$;
 
--- 6. Auto-award prize points when a tournament is marked completed
+-- 6. Winner takes all: payout = entry fee x approved players.
+--    Runs when a tournament is marked completed.
 CREATE OR REPLACE FUNCTION award_tournament_prize()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
+DECLARE
+  entry int;
+  joined int;
+  pool int;
 BEGIN
-  IF NEW.status = 'completed' AND NEW.winner_id IS NOT NULL AND COALESCE(NEW.points_prize, 0) > 0 THEN
-    PERFORM award_points(NEW.winner_id, NEW.points_prize);
+  IF NEW.status = 'completed' AND OLD.status IS DISTINCT FROM 'completed' AND NEW.winner_id IS NOT NULL THEN
+    SELECT COALESCE(points_cost, 0) INTO entry FROM tournaments WHERE id = NEW.id;
+    SELECT COUNT(*) INTO joined FROM tournament_players
+      WHERE tournament_id = NEW.id AND status = 'approved';
+    pool := entry * joined;
+    IF pool > 0 THEN
+      PERFORM award_points(NEW.winner_id, pool);
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -62,6 +74,34 @@ DROP TRIGGER IF EXISTS trg_award_tournament_prize ON tournaments;
 CREATE TRIGGER trg_award_tournament_prize
   AFTER UPDATE ON tournaments
   FOR EACH ROW EXECUTE FUNCTION award_tournament_prize();
+
+-- 6b. AI match verification fields + opponent confirmation auto-lock
+ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS confirmed boolean DEFAULT false;
+ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS verification_status text DEFAULT 'pending';
+ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS ai_detected_winner text DEFAULT '';
+ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS ai_detected_score text DEFAULT '';
+ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS ai_confidence numeric DEFAULT 0;
+ALTER TABLE tournament_matches ADD COLUMN IF NOT EXISTS ai_verified_at timestamptz DEFAULT NULL;
+
+CREATE OR REPLACE FUNCTION confirm_match()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NEW.confirmed = true AND OLD.confirmed IS DISTINCT FROM true THEN
+    NEW.verification_status := 'locked';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_confirm_match ON tournament_matches;
+CREATE TRIGGER trg_confirm_match
+  AFTER UPDATE ON tournament_matches
+  FOR EACH ROW
+  WHEN (NEW.confirmed = true AND OLD.confirmed IS DISTINCT FROM true)
+  EXECUTE FUNCTION confirm_match();
 
 -- 7. Lock down who can run these functions
 REVOKE ALL ON FUNCTION decrement_points(int) FROM PUBLIC;

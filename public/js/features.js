@@ -564,11 +564,8 @@ window.initTournamentDetail = async function () {
     document.getElementById('td-game').textContent = t.game || 'DLS 25';
     document.getElementById('td-desc').textContent = t.description || '';
     document.getElementById('td-desc').classList.toggle('hidden', !t.description);
-    document.getElementById('td-prize').textContent = t.prize ? '🏆 ' + t.prize : (t.points_prize > 0 ? '🏆 ' + t.points_prize + ' pts' : '');
+    document.getElementById('td-prize').textContent = t.prize ? '🏆 ' + t.prize : '';
     document.getElementById('td-fee').textContent = t.points_cost > 0 ? 'Entry fee: ' + t.points_cost + ' pts' : 'Free entry';
-    if (t.points_cost > 0 && t.points_prize > 0) {
-      document.getElementById('td-prize').textContent += ' · Winner: ' + t.points_prize + ' pts';
-    }
 
     var statusColors = { registration: 'bg-blue-500/20 text-blue-400', in_progress: 'bg-lime/20 text-lime', completed: 'bg-green-500/20 text-green-400', cancelled: 'bg-coral/20 text-coral' };
     var statusLabels = { registration: 'Registration Open', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled' };
@@ -583,6 +580,12 @@ window.initTournamentDetail = async function () {
     var { count } = await window.supabase.from('tournament_players').select('*', { count: 'exact', head: true }).eq('tournament_id', tournamentId).eq('status', 'approved');
     document.getElementById('td-players-count').innerHTML = '<i data-lucide="users" class="w-4 h-4 inline mr-1"></i> ' + (count || 0) + '/' + t.max_players + ' players';
     if (window.lucide) lucide.createIcons();
+
+    // Winner takes all: pool = entry fee x approved players
+    var poolPrize = (t.points_cost || 0) * (count || 0);
+    if (poolPrize > 0) {
+      document.getElementById('td-prize').textContent += (document.getElementById('td-prize').textContent ? ' · ' : '') + 'Winner takes all: ' + poolPrize + ' pts';
+    }
 
     // Action buttons
     var isCreator = window.currentUser && t.created_by === window.currentUser.id;
@@ -1021,14 +1024,8 @@ window.joinTournament = async function () {
   if (teamName.length > 40) { window.showToast('Team name too long (max 40 chars)', 'error'); return; }
 
   try {
-    // Deduct entry fee server-side (atomic, cheat-proof)
-    if (cost > 0) {
-      var { error: deductError } = await window.supabase.rpc('decrement_points', { amount: cost });
-      if (deductError) { window.showToast('Failed to deduct points', 'error'); return; }
-    }
-
     // Always auto-approve — no more payment modal
-    await window.supabase.from('tournament_players').insert({
+    var { error: insertError } = await window.supabase.from('tournament_players').insert({
       tournament_id: _currentTournament.id,
       user_id: window.currentUser.id,
       username: window.currentUserDoc?.username || 'Anonymous',
@@ -1037,6 +1034,20 @@ window.joinTournament = async function () {
       status: 'approved',
       joined_at: new Date().toISOString()
     });
+
+    if (insertError) throw insertError;
+
+    // Deduct entry fee AFTER a successful join, so a failed join never costs points.
+    if (cost > 0) {
+      var { error: deductError } = await window.supabase.rpc('decrement_points', { amount: cost });
+      if (deductError) {
+        await window.supabase.from('tournament_players').delete()
+          .eq('tournament_id', _currentTournament.id)
+          .eq('user_id', window.currentUser.id);
+        window.showToast('Failed to deduct points', 'error');
+        return;
+      }
+    }
 
     window.showToast('Joined tournament ✅');
     setTimeout(window.updateNavPoints, 300);
@@ -1310,18 +1321,46 @@ window.handleSubmitResult = async function () {
       winnerName = match.player2_name;
     }
 
-    await window.supabase.from('tournament_matches').update({
-      player1_score: score1,
-      player2_score: score2,
-      screenshot_url: screenshotUrl,
-      proposed_winner_id: winnerId,
-      proposed_winner_name: winnerName,
-      result_submitted_by: window.currentUser.id,
-      status: 'pending_confirmation'
-    }).eq('id', _pendingResultMatchId);
+    // AI verification: the edge function scans the screenshot and auto-locks
+    // the match when it confirms the proposed winner with 80%+ confidence.
+    var aiVerified = false;
+    try {
+      var aiResp = await window.supabase.functions.invoke('verify-match', {
+        body: {
+          matchId: _pendingResultMatchId,
+          screenshotUrl: screenshotUrl,
+          playerOneName: match.player1_name,
+          playerTwoName: match.player2_name,
+          proposedWinnerName: winnerName,
+          player1Score: score1,
+          player2Score: score2,
+          winnerId: winnerId,
+          winnerName: winnerName
+        }
+      });
+      aiVerified = !!(aiResp && aiResp.data && aiResp.data.verified);
+    } catch (e) {
+      aiVerified = false;
+    }
 
-    window.closeSubmitResultModal();
-    window.showToast('Result submitted. Waiting for opponent confirmation ⏳');
+    if (aiVerified) {
+      window.closeSubmitResultModal();
+      window.showToast('Result verified by AI ✅');
+      await advanceRoundIfComplete(match.tournament_id, match.round);
+    } else {
+      await window.supabase.from('tournament_matches').update({
+        player1_score: score1,
+        player2_score: score2,
+        screenshot_url: screenshotUrl,
+        proposed_winner_id: winnerId,
+        proposed_winner_name: winnerName,
+        result_submitted_by: window.currentUser.id,
+        status: 'pending_confirmation'
+      }).eq('id', _pendingResultMatchId);
+
+      window.closeSubmitResultModal();
+      window.showToast('Result submitted. Waiting for opponent confirmation ⏳');
+    }
     initTournamentDetail();
   } catch (err) {
     errEl.textContent = 'Failed to submit result: ' + (err.message || 'unknown error');
