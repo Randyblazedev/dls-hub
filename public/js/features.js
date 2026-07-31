@@ -921,11 +921,12 @@ async function renderMatches() {
 
         if (m.status === 'pending_confirmation') {
           var submittedByMe = m.result_submitted_by === currentUserId;
-          html += '<p class="text-xs text-yellow-400 mt-2">⏳ Result submitted' + (submittedByMe ? ' — waiting for opponent confirmation' : ' — needs your confirmation') + '</p>';
+          var canReview = isCreator || !!(window.currentUserDoc && window.currentUserDoc.is_admin);
+          html += '<p class="text-xs text-yellow-400 mt-2">⏳ Result submitted — waiting for host/admin review</p>';
           if (m.screenshot_url) {
             html += '<a href="' + window.escAttr(m.screenshot_url) + '" target="_blank" rel="noopener" class="text-xs text-lime underline mt-1 inline-block">View score screenshot</a>';
           }
-          if (!submittedByMe && (userInMatch || isCreator)) {
+          if (canReview && !submittedByMe) {
             html += '<div class="mt-2"><button onclick="confirmMatchResult(\'' + m.id + '\')" class="btn-lime text-xs px-4 py-1.5">Confirm Result</button></div>';
           }
         }
@@ -1255,23 +1256,17 @@ window.uploadResultScreenshot = async function (file) {
 
 window.confirmMatchResult = async function (matchId) {
   if (!window.currentUser) { window.showToast('Please log in', 'error'); return; }
-  var { data: match, error } = await window.supabase.from('tournament_matches').select('*').eq('id', matchId).single();
-  if (error || !match) { window.showToast('Match not found', 'error'); return; }
-  if (match.status !== 'pending_confirmation') { window.showToast('Nothing to confirm', 'error'); return; }
 
-  var isPlayer = match.player1_id === window.currentUser.id || match.player2_id === window.currentUser.id;
   var isHost = _currentTournament && _currentTournament.created_by === window.currentUser.id;
-  if (!isPlayer && !isHost) { window.showToast('Only the players or host can confirm', 'error'); return; }
-  if (isPlayer && !isHost && match.result_submitted_by === window.currentUser.id) { window.showToast('Wait for your opponent to confirm', 'error'); return; }
+  var isAdmin = !!(window.currentUserDoc && window.currentUserDoc.is_admin);
+  if (!isHost && !isAdmin) { window.showToast('Only the host or an admin can confirm results', 'error'); return; }
 
-  await window.supabase.from('tournament_matches').update({
-    status: 'completed',
-    winner_id: match.proposed_winner_id,
-    winner_name: match.proposed_winner_name
-  }).eq('id', matchId);
+  var { error } = await window.supabase.rpc('confirm_match_result', { match_id: matchId });
+  if (error) { window.showToast('Failed to confirm: ' + error.message, 'error'); return; }
 
+  var { data: match } = await window.supabase.from('tournament_matches').select('tournament_id, round').eq('id', matchId).single();
   window.showToast('Result confirmed ✅');
-  await advanceRoundIfComplete(match.tournament_id, match.round);
+  if (match) await advanceRoundIfComplete(match.tournament_id, match.round);
   initTournamentDetail();
 };
 

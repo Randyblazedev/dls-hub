@@ -59,7 +59,7 @@ Reply ONLY with JSON: {"winner": "<exact team name>", "score": "<full score text
     const aiWinner = parsed.winner?.trim().toLowerCase() || "";
     const proposed = proposedWinnerName?.trim().toLowerCase() || "";
     const confidence = Number(parsed.confidence) || 0;
-    const verified = aiWinner === proposed && confidence >= 80;
+    const verified = aiWinner === proposed && confidence >= 85;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
