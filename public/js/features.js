@@ -314,7 +314,7 @@ async function initAdmin() {
         var banBtn = u.is_admin ? '' : (u.banned
           ? '<button data-action="admin-unban" data-uid="' + window.escAttr(u.uid) + '" class="text-lime text-xs hover:underline mr-3">Unban</button>'
           : '<button data-action="admin-ban" data-uid="' + window.escAttr(u.uid) + '" class="text-mist text-xs hover:text-coral mr-3">Ban</button>');
-        var removeBtn = u.is_admin ? '' : '<button data-action="admin-remove" data-uid="' + window.escAttr(u.uid) + '" data-username="' + window.escAttr(u.username) + '" class="text-coral text-xs hover:text-white">Remove</button>';
+        var removeBtn = u.is_admin ? '' : '<button data-action="admin-remove" data-uid="' + window.escAttr(u.uid) + '" data-username="' + window.escHtml(u.username) + '" class="text-coral text-xs hover:text-white">Remove</button>';
         return '<div class="flex items-center justify-between py-2.5 border-b border-line"><div class="min-w-0"><p class="text-ice text-sm">' + window.escHtml(u.username) + meTag + bannedTag + '</p><p class="text-mist text-xs truncate">' + window.escHtml(u.email || '') + '</p></div><div class="shrink-0">' + banBtn + removeBtn + '</div></div>';
       }).join('') : '<p class="text-mist text-sm">No users.</p>';
     }
@@ -401,31 +401,168 @@ window.adminRemoveUser = async function(uid, username) {
   }
 };
 
-// ═══ POINTS DISPLAY ═══
-window.updateNavPoints = function () {
-  if (!window.currentUser) {
-    var np = document.getElementById('nav-points');
-    if (np) np.classList.add('hidden');
-    return;
+// ═══ POINTS, DIVISIONS AND TITLES ═══
+// The bands mirror division_for() in tournament-league.sql. Kept in one place here so the
+// progress bar can be drawn without a round trip; the database still owns the real value.
+var DIVISIONS = [
+  { name: 'Bronze',     at: 0,     colour: '#b45309' },
+  { name: 'Bronze III', at: 200,   colour: '#b45309' },
+  { name: 'Bronze II',  at: 500,   colour: '#a16207' },
+  { name: 'Silver',     at: 1000,  colour: '#94a3b8' },
+  { name: 'Gold',       at: 1800,  colour: '#eab308' },
+  { name: 'Platinum',   at: 3000,  colour: '#22d3ee' },
+  { name: 'Diamond',    at: 5000,  colour: '#60a5fa' },
+  { name: 'Elite',      at: 8000,  colour: '#a78bfa' },
+  { name: 'Legend',     at: 12000, colour: '#f43f5e' }
+];
+
+function divisionInfo(points) {
+  var p = Math.max(0, points || 0);
+  var current = DIVISIONS[0], next = null;
+  for (var i = 0; i < DIVISIONS.length; i++) {
+    if (p >= DIVISIONS[i].at) current = DIVISIONS[i];
+    else { next = DIVISIONS[i]; break; }
   }
-  window.supabase.from('users').select('points').eq('uid', window.currentUser.id).single().then(function (res) {
-    if (res.data) {
-      var el = document.getElementById('nav-points-amount');
-      if (el) el.textContent = res.data.points || 0;
-      var np = document.getElementById('nav-points');
-      if (np) np.classList.remove('hidden');
-    }
-  }).catch(function () {});
+  var pct = 100;
+  if (next) {
+    pct = Math.min(100, Math.max(0, Math.round(((p - current.at) * 100) / (next.at - current.at))));
+  }
+  return {
+    name: current.name,
+    colour: current.colour,
+    next: next ? next.name : null,
+    toNext: next ? Math.max(0, next.at - p) : 0,
+    pct: pct
+  };
+}
+window.divisionInfo = divisionInfo;
+// Ordered rank, for sorting standings.
+window.divisionRank = function (name) {
+  for (var i = DIVISIONS.length - 1; i >= 0; i--) if (DIVISIONS[i].name === name) return i;
+  return 0;
 };
 
-window.updateProfilePoints = function () {
-  if (!window.currentUser) return;
-  window.supabase.from('users').select('points').eq('uid', window.currentUser.id).single().then(function (res) {
-    if (res.data) {
-      var el = document.getElementById('profile-points-amount');
-      if (el) el.textContent = res.data.points || 0;
-    }
-  }).catch(function () {});
+// One fetch paints the nav, the profile and anything else that shows standing.
+window.refreshStanding = function () {
+  if (!window.currentUser) {
+    ['nav-points', 'nav-division'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+    return Promise.resolve();
+  }
+  return window.supabase
+    .from('users')
+    .select('points,division,titles')
+    .eq('uid', window.currentUser.id)
+    .single()
+    .then(function (res) {
+      var row = res.data || {};
+      var points = row.points || 0;
+      var info = divisionInfo(points);
+
+      var np = document.getElementById('nav-points');
+      if (np) np.classList.remove('hidden');
+      var amt = document.getElementById('nav-points-amount');
+      if (amt) amt.textContent = points;
+
+      var nd = document.getElementById('nav-division');
+      var ndName = document.getElementById('nav-division-name');
+      if (nd && ndName) {
+        ndName.textContent = info.name;
+        ndName.style.color = info.colour;
+        nd.classList.remove('hidden');
+      }
+
+      var pa = document.getElementById('profile-points-amount');
+      if (pa) pa.textContent = points;
+
+      var pd = document.getElementById('profile-division');
+      if (pd) {
+        pd.textContent = info.name;
+        pd.style.color = info.colour;
+        pd.style.borderColor = info.colour;
+      }
+      var bar = document.getElementById('profile-division-bar');
+      if (bar) {
+        bar.style.width = info.pct + '%';
+        bar.style.background = info.colour;
+      }
+      var nxt = document.getElementById('profile-division-next');
+      if (nxt) {
+        nxt.textContent = info.next
+          ? info.toNext + ' points to ' + info.next
+          : 'Top division reached';
+      }
+
+      var titles = row.titles || 0;
+      var tw = document.getElementById('profile-titles');
+      var tc = document.getElementById('profile-titles-count');
+      if (tc) tc.textContent = titles;
+      if (tw) tw.classList.toggle('hidden', titles === 0);
+
+      return row;
+    })
+    .catch(function () {});
+};
+
+// Kept because app.js and the page router call these by name.
+window.updateNavPoints = function () { window.refreshStanding(); };
+window.updateProfilePoints = function () { window.refreshStanding(); };
+
+// ─── Standings table, for the tournaments page ───
+var _standingsLoaded = false;
+window.toggleStandings = function () {
+  var panel = document.getElementById('standings-panel');
+  var chev = document.getElementById('standings-chevron');
+  if (!panel) return;
+  var opening = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !opening);
+  if (chev) chev.style.transform = opening ? 'rotate(180deg)' : '';
+  // Load on first open only: no point querying for a panel nobody opened.
+  if (opening && !_standingsLoaded) {
+    _standingsLoaded = true;
+    window.initStandings();
+  }
+};
+
+window.initStandings = function () {
+  var host = document.getElementById('standings-list');
+  if (!host) return;
+  _standingsLoaded = true;
+  host.innerHTML = '<p class="text-mist text-sm">Loading standings…</p>';
+  window.supabase
+    .from('tournament_standings')
+    .select('uid,username,avatar,points,division,titles,wins,losses')
+    .order('points', { ascending: false })
+    .limit(50)
+    .then(function (res) {
+      if (res.error || !res.data || !res.data.length) {
+        host.innerHTML = '<p class="text-mist text-sm">No standings yet — play a tournament to appear here.</p>';
+        return;
+      }
+      var me = window.currentUser ? window.currentUser.id : null;
+      host.innerHTML = res.data.map(function (u, i) {
+        var info = divisionInfo(u.points);
+        var isMe = u.uid === me;
+        var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+        return '<div class="flex items-center gap-3 px-3 py-2.5 rounded-xl border ' +
+          (isMe ? 'border-lime/60 bg-lime/5' : 'border-line bg-turf') + '">' +
+          '<span class="w-7 text-center text-xs text-mist shrink-0">' + medal + '</span>' +
+          '<img src="' + window.escHtml(u.avatar || 'public/images/logo.jpg') + '" alt="" class="w-8 h-8 rounded-full object-cover shrink-0" onerror="this.src=\'public/images/logo.jpg\'">' +
+          '<div class="min-w-0 flex-1">' +
+            '<p class="text-sm font-semibold text-ice truncate">' + window.escHtml(u.username || 'Player') + '</p>' +
+            '<p class="text-[11px] text-mist">' + (u.wins || 0) + 'W · ' + (u.losses || 0) + 'L' +
+              (u.titles ? ' · 🏆 ' + u.titles : '') + '</p>' +
+          '</div>' +
+          '<span class="text-xs font-semibold shrink-0" style="color:' + info.colour + '">' + info.name + '</span>' +
+          '<span class="text-sm font-bold text-lime shrink-0 w-14 text-right">' + (u.points || 0) + '</span>' +
+          '</div>';
+      }).join('');
+    })
+    .catch(function () {
+      host.innerHTML = '<p class="text-mist text-sm">Could not load standings.</p>';
+    });
 };
 
 // Hook into app.js onAuthChange by patching the navigate function

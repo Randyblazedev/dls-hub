@@ -135,12 +135,12 @@ window.navigate = function (page) {
   if (page === "feed")         initFeed();
   if (page === "chat")         initChat();
   if (page === "profile")      initProfile();
-  if (page === "profile")      setTimeout(window.updateProfilePoints, 300);
+  if (page === "profile")      setTimeout(window.refreshStanding || window.updateProfilePoints, 300);
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
   if (page === "admin")        initAdmin();
-  if (page === "tournaments")  initTournamentsList();
-  if (page === "tournaments" || page === "tournament-detail" || page === "tournament-list") setTimeout(window.updateNavPoints, 300);
+  if (page === "tournaments")  { initTournamentsList(); if (window.initStandings) window.initStandings(); }
+  if (page === "tournaments" || page === "tournament-detail" || page === "tournament-list") setTimeout(window.refreshStanding || window.updateNavPoints, 300);
   if (page === "tournament-detail") initTournamentDetail();
 
   // Re-init icons after DOM changes
