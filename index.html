@@ -103,6 +103,13 @@
           <span id="nav-division-name">Bronze</span>
         </span>
 
+        <!-- Admin (only rendered for admins; the database decides, not this file) -->
+        <button id="admin-pill" onclick="navigate('admin')"
+                class="hidden items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-lime/40 text-lime bg-lime/5 hover:bg-lime/15 transition"
+                title="Admin panel">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i>Admin
+        </button>
+
         <!-- Theme toggle -->
         <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
           <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
@@ -149,7 +156,7 @@
         <button onclick="navigate('dm');toggleMobileMenu()"           class="text-left hover:text-ice">Messages</button>
         <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
         <button onclick="navigate('tournaments')" class="nav-link hover:text-ice transition">Tournaments</button>
-        <button onclick="navigate('admin');toggleMobileMenu()"        class="text-left hover:text-ice">Admin</button>
+        <button id="admin-mobile-link" onclick="navigate('admin');toggleMobileMenu()" class="hidden text-left text-lime">Admin</button>
         <button onclick="navigate('profile');toggleMobileMenu()"      class="text-left hover:text-ice">My Profile</button>
         <button onclick="handleSignOut()"                              class="text-left text-coral">Sign Out</button>
       </div>

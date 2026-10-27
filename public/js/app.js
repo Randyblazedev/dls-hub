@@ -216,8 +216,18 @@ onAuthChange(async (user) => {
     mobileNavAuth.classList.remove("hidden");
     // Show admin link only if the DATABASE says so (server-enforced via RLS),
     // not just a hardcoded client-side email check.
+    // Admin entry points. is_admin comes from the database (see notifications-fix.sql,
+    // which creates the column), never from a hardcoded email in the client.
+    var isAdmin = !!(currentUserDoc && currentUserDoc.is_admin);
     var adminLink = document.getElementById("admin-nav-link");
-    if (adminLink) { adminLink.classList.toggle("hidden", !currentUserDoc?.is_admin); }
+    if (adminLink) { adminLink.classList.toggle("hidden", !isAdmin); }
+    var adminPill = document.getElementById("admin-pill");
+    if (adminPill) {
+      adminPill.classList.toggle("hidden", !isAdmin);
+      adminPill.classList.toggle("flex", isAdmin);
+    }
+    var adminMobile = document.getElementById("admin-mobile-link");
+    if (adminMobile) { adminMobile.classList.toggle("hidden", !isAdmin); }
     mobileNavAuth.style.display = "flex";
 
     loadHomeStats();
