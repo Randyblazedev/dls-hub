@@ -745,3 +745,120 @@ html.light .td-tab { border-color: #e0e0e0; color: #607d8b; }
 html.light .td-tab-active { background: linear-gradient(135deg, #1565c0, #1976d2); color: #ffffff; }
 html.light .tournament-filter { border-color: #e0e0e0; color: #607d8b; }
 html.light .tournament-filter-active { background: linear-gradient(135deg, #1565c0, #1976d2); color: #ffffff; }
+
+/* ═══════════════════════════════════════════════════════════
+   V4 POLISH LAYER
+   Appended, not replacing anything above. Every rule here is
+   either a correction to an inconsistency that was already in
+   the app, or something the app was missing entirely.
+   No layout, position or colour scheme is changed.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --gold-soft: rgba(255, 214, 0, 0.12);
+  --gold-line: rgba(255, 214, 0, 0.35);
+  --hairline: rgba(255, 255, 255, 0.08);
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* ── Taps feel instant ── */
+button, [onclick], .btn-lime, .btn-ghost, a { -webkit-tap-highlight-color: transparent; }
+button:active, [onclick]:active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── One scale of corner radii, so nothing looks hand-cut ── */
+.rounded-xl  { border-radius: var(--radius-md) !important; }
+.rounded-2xl { border-radius: var(--radius-lg) !important; }
+
+/* ── Cards respond to the cursor. Nothing did before this. ── */
+[class*="border-line"][class*="bg-turf"],
+[class*="border-line"][class*="bg-carbon"] {
+  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease),
+              box-shadow 0.18s var(--ease);
+}
+[class*="border-line"][class*="bg-turf"]:hover,
+[class*="border-line"][class*="bg-carbon"]:hover { border-color: var(--gold-line); }
+
+/* ── Focus: keyboard users get a ring, mouse users get nothing harsh ── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid #ffd600;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.form-input:focus-visible { outline-offset: 0; }
+
+/* ── Touch targets. Under 44px a button is a guess on a phone. ── */
+@media (max-width: 767px) {
+  button:not(.no-min-tap),
+  .btn-lime,
+  .btn-ghost,
+  [onclick]:not(.no-min-tap) { min-height: 44px; }
+  .min-h-0, .h-8, .h-9, .h-10 { min-height: revert; }
+  body { font-size: 15px; }
+  /* the bottom nav must never sit on top of the last card */
+  main, .pb-safe { padding-bottom: 84px; }
+}
+
+/* ── Scrollbars: a light bar on a dark app reads as broken ── */
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 214, 0, 0.25) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 214, 0, 0.22);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 214, 0, 0.4); }
+
+/* ── Headings: the display font was applied inconsistently ── */
+h1, h2, h3, .font-display { letter-spacing: -0.01em; }
+h1 { font-family: 'Rajdhani', sans-serif; font-weight: 700; }
+
+/* ── Long words and links must wrap, not push the card wide ── */
+p, h1, h2, h3, h4, span, div { overflow-wrap: anywhere; }
+
+/* ── Images ── */
+img { background-color: rgba(255, 255, 255, 0.03); }
+img[src=""], img:not([src]) { visibility: hidden; }
+
+/* ── Empty states: a bare "no results" line reads as a bug ── */
+#standings-list > p.text-mist:only-child,
+#tournament-list > p.text-mist:only-child,
+#notif-list > p.text-mist:only-child {
+  text-align: center;
+  padding: 28px 16px;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+/* ── Shadows that actually read on a dark page ── */
+.shadow-xl, .shadow-2xl {
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* ── Gold as a background needs dark text, or it is unreadable ── */
+.bg-lime, .btn-lime { color: #0d1b2a; }
+
+/* ── Skeleton loading, so a slow query does not look like an empty page ── */
+.skeleton {
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 37%,
+    rgba(255, 255, 255, 0.04) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: var(--radius-md);
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}

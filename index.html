@@ -98,6 +98,18 @@
           <i data-lucide="coins" class="w-3.5 h-3.5 inline mr-1"></i><span id="nav-points-amount">0</span>
         </span>
 
+        <!-- Division badge (logged-in only) -->
+        <span id="nav-division" class="hidden text-xs font-semibold bg-turf border border-line rounded-full px-3 py-1" title="Your division">
+          <span id="nav-division-name">Bronze</span>
+        </span>
+
+        <!-- Admin (only rendered for admins; the database decides, not this file) -->
+        <button id="admin-pill" onclick="navigate('admin')"
+                class="hidden items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-lime/40 text-lime bg-lime/5 hover:bg-lime/15 transition"
+                title="Admin panel">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i>Admin
+        </button>
+
         <!-- Theme toggle -->
         <button onclick="toggleTheme()" class="p-2 text-mist hover:text-lime transition" title="Toggle theme">
           <i data-lucide="sun" id="theme-icon-light" class="w-5 h-5 hidden"></i>
@@ -144,7 +156,7 @@
         <button onclick="navigate('dm');toggleMobileMenu()"           class="text-left hover:text-ice">Messages</button>
         <button onclick="navigate('leaderboards')" class="nav-link hover:text-ice transition">Leaderboards</button>
         <button onclick="navigate('tournaments')" class="nav-link hover:text-ice transition">Tournaments</button>
-        <button onclick="navigate('admin');toggleMobileMenu()"        class="text-left hover:text-ice">Admin</button>
+        <button id="admin-mobile-link" onclick="navigate('admin');toggleMobileMenu()" class="hidden text-left text-lime">Admin</button>
         <button onclick="navigate('profile');toggleMobileMenu()"      class="text-left hover:text-ice">My Profile</button>
         <button onclick="handleSignOut()"                              class="text-left text-coral">Sign Out</button>
       </div>
@@ -372,6 +384,18 @@
             <p id="profile-email" class="text-mist text-sm mb-2"></p>
             <p id="profile-team" class="text-ice text-sm"></p>
             <p id="profile-points" class="text-lime text-sm font-medium"><i data-lucide="coins" class="w-4 h-4 inline mr-1"></i><span id="profile-points-amount">0</span> points</p>
+
+            <!-- Division and progress towards the next one -->
+            <div class="mt-2 max-w-xs mx-auto sm:mx-0">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <span id="profile-division" class="font-semibold text-ice px-2 py-0.5 rounded-full border border-line bg-turf">Bronze</span>
+                <span id="profile-titles" class="text-mist hidden"><i data-lucide="trophy" class="w-3.5 h-3.5 inline mr-1"></i><span id="profile-titles-count">0</span></span>
+              </div>
+              <div class="mt-2 h-1.5 w-full rounded-full bg-turf border border-line overflow-hidden">
+                <div id="profile-division-bar" class="h-full bg-lime transition-all duration-500" style="width:0%"></div>
+              </div>
+              <p id="profile-division-next" class="mt-1 text-[11px] text-mist">0 to Silver</p>
+            </div>
             <p id="profile-lastseen" class="text-xs text-mist mt-1"></p>
           </div>
           <button onclick="toggleEditProfile()" class="btn-ghost text-sm px-4 py-2">Edit Profile</button>
@@ -640,6 +664,22 @@
           <button onclick="switchTournamentFilter('registration')" id="tfilter-registration" class="tournament-filter">Open</button>
           <button onclick="switchTournamentFilter('in_progress')" id="tfilter-in_progress" class="tournament-filter">In Progress</button>
           <button onclick="switchTournamentFilter('completed')" id="tfilter-completed" class="tournament-filter">Completed</button>
+        </div>
+
+        <!-- Standings: the league table, above the tournament list -->
+        <div class="mb-8 rounded-2xl border border-line bg-carbon/60 overflow-hidden">
+          <button onclick="toggleStandings()" id="standings-toggle"
+                  class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-turf/50 transition">
+            <span class="flex items-center gap-2">
+              <i data-lucide="trophy" class="w-4 h-4 text-lime"></i>
+              <span class="font-display text-lg text-ice">Standings</span>
+              <span class="text-[11px] text-mist">points · division · titles</span>
+            </span>
+            <i data-lucide="chevron-down" id="standings-chevron" class="w-4 h-4 text-mist transition-transform"></i>
+          </button>
+          <div id="standings-panel" class="hidden px-3 pb-3">
+            <div id="standings-list" class="space-y-1.5"></div>
+          </div>
         </div>
 
         <!-- Tournament list -->

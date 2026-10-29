@@ -135,12 +135,12 @@ window.navigate = function (page) {
   if (page === "feed")         initFeed();
   if (page === "chat")         initChat();
   if (page === "profile")      initProfile();
-  if (page === "profile")      setTimeout(window.updateProfilePoints, 300);
+  if (page === "profile")      setTimeout(window.refreshStanding || window.updateProfilePoints, 300);
   if (page === "leaderboards") initLeaderboard("posts");
   if (page === "dm")           initDM();
   if (page === "admin")        initAdmin();
-  if (page === "tournaments")  initTournamentsList();
-  if (page === "tournaments" || page === "tournament-detail" || page === "tournament-list") setTimeout(window.updateNavPoints, 300);
+  if (page === "tournaments")  { initTournamentsList(); if (window.initStandings) window.initStandings(); }
+  if (page === "tournaments" || page === "tournament-detail" || page === "tournament-list") setTimeout(window.refreshStanding || window.updateNavPoints, 300);
   if (page === "tournament-detail") initTournamentDetail();
 
   // Re-init icons after DOM changes
@@ -216,8 +216,18 @@ onAuthChange(async (user) => {
     mobileNavAuth.classList.remove("hidden");
     // Show admin link only if the DATABASE says so (server-enforced via RLS),
     // not just a hardcoded client-side email check.
+    // Admin entry points. is_admin comes from the database (see notifications-fix.sql,
+    // which creates the column), never from a hardcoded email in the client.
+    var isAdmin = !!(currentUserDoc && currentUserDoc.is_admin);
     var adminLink = document.getElementById("admin-nav-link");
-    if (adminLink) { adminLink.classList.toggle("hidden", !currentUserDoc?.is_admin); }
+    if (adminLink) { adminLink.classList.toggle("hidden", !isAdmin); }
+    var adminPill = document.getElementById("admin-pill");
+    if (adminPill) {
+      adminPill.classList.toggle("hidden", !isAdmin);
+      adminPill.classList.toggle("flex", isAdmin);
+    }
+    var adminMobile = document.getElementById("admin-mobile-link");
+    if (adminMobile) { adminMobile.classList.toggle("hidden", !isAdmin); }
     mobileNavAuth.style.display = "flex";
 
     loadHomeStats();
@@ -1465,6 +1475,14 @@ window.sendChatMessage = async function () {
     if (error) throw error;
     cancelChatReply();
 
+    // Push to everyone else. The database trigger writes the in-app notification
+    // (see notifications-fix.sql), but a realtime broadcast only reaches people who
+    // already have the app open on the chat page. Without this, nobody who had the
+    // app closed was ever told about a new message.
+    if (typeof sendPushToUser === "function") {
+      pushChatToEveryone(currentUserDoc?.username || "Someone", message);
+    }
+
     // Broadcast to all online users so they get a live notification
     // even if they're not on the chat page — no DB writes needed
     if (chatBroadcastChannel) {
@@ -2272,6 +2290,35 @@ function urlBase64ToUint8Array(base64String) {
   const base64  = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw     = window.atob(base64);
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+/**
+ * Fan a new chat message out to every other user.
+ *
+ * Deliberately fire-and-forget and throttled: chat is high frequency, so pushing
+ * every message to every user would hammer the push service and burn battery. This
+ * sends one push per sender per 45 seconds, which is enough to pull someone back
+ * into the app without turning their phone into a pager.
+ */
+let _lastChatPushAt = 0;
+async function pushChatToEveryone(authorName, message) {
+  const now = Date.now();
+  if (now - _lastChatPushAt < 45000) return;
+  _lastChatPushAt = now;
+
+  try {
+    const { data } = await supabase
+      .from("users")
+      .select("uid")
+      .neq("uid", currentUser.id)
+      .limit(100);
+
+    const body = (authorName + ": " + (message || "sent a photo")).slice(0, 90);
+    (data || []).forEach(function (u) {
+      // no await: one slow push must never hold up the sender's message
+      sendPushToUser(u.uid, "New message", body, "/?page=chat");
+    });
+  } catch (_) { /* the in-app notification already exists */ }
 }
 
 /** Send a push notification to a user via the Edge Function */
